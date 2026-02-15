@@ -1,101 +1,103 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const sharp = require('sharp');
-
 
 router.post('/generate-floorplan', async (req, res) => {
   try {
     const { prompt: userPrompt, details } = req.body;
 
-  
     let finalPrompt = userPrompt;
+
+    // --- STEP 1: ULTRA-PRECISE PROMPT ENGINEERING ---
     if (details) {
       const { bedrooms, bathrooms, sqFeet, layoutType, archStyle, features } = details;
-      finalPrompt = `Top-down floor plan, architectural blueprint style, ${sqFeet} sqft, ${bedrooms} bedrooms, ${bathrooms} bathrooms, ${layoutType}, ${archStyle}. Distinct room labels. Clear wall lines. Spaces: ${features}. High contrast, white background.`;
+      
+      // We construct a prompt that mimics a professional 3D architectural renderer.
+      // "Orthographic" is the key to getting that perfect isometric angle.
+      finalPrompt = `High-angle isometric 3D floor plan render, cutaway view, white background. 
+      Architectural style: ${archStyle || 'Modern Contemporary'}.
+      Layout specifications: ${sqFeet} sqft, ${bedrooms} bedrooms, ${bathrooms} bathrooms, ${layoutType}.
+      
+      CRITICAL DETAILS:
+      - Walls: Thick white cutaway walls, clear room separation.
+      - Flooring: High-quality wooden textures for living areas, tiles for bathrooms.
+      - Lighting: Global illumination, soft sun lighting, ambient occlusion (no harsh shadows).
+      - Furniture: Fully furnished with realistic ${archStyle || 'modern'} furniture, beds, sofas, dining table.
+      - View: Orthographic projection (perfect 30-degree isometric angle).
+      
+      Rooms included: ${features}. 8k resolution, photorealistic, architectural visualization, unreal engine 5 style.`;
     }
 
     if (!finalPrompt) {
       return res.status(400).json({ error: 'Prompt or details are required' });
     }
 
-   
-    const encodedPrompt = encodeURIComponent(finalPrompt + " text labels, measurements, dimensions, technical drawing, 8k");
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=768&model=flux`;
+    // --- STEP 2: MAXIMIZED RESOLUTION & MODEL SETTINGS ---
+    // We use a 16:9 aspect ratio (1280x720) for a "Large Perfect Fit" on screens.
+    // 'flux' is the only model capable of this level of adherence.
+    const width = 1280;
+    const height = 720;
+    const seed = Math.floor(Math.random() * 1000000); // Random seed for unique variations
+    
+    // Encode the prompt safely
+    const encodedPrompt = encodeURIComponent(finalPrompt);
 
-    console.log('Generating floor plan via Pollinations:', url);
+    // Construct the URL with high-quality parameters
+    const url = `https://gen.pollinations.ai/image/${encodedPrompt}?width=${width}&height=${height}&model=flux&nologo=true&seed=${seed}&enhance=true`;
+
+    console.log('Generating High-Fidelity 3D Floor Plan...');
 
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
-      timeout: 300000, // 5 minutes (effectively no timeout for this use case)
+      timeout: 600000, // Extended timeout (10 mins) for high-res generation
+      headers: {
+        'Authorization': `Bearer ${process.env.POLLINATIONS_API_KEY || 'sk_W22pdunPcWR5L8KbbEnz98jFj6IsRQGq'}`,
+        'User-Agent': 'imagen'
+      }
     });
 
-    console.log('Pollinations response received, processing image...');
+    console.log('Image received from Pollinations.');
 
-    // Crop bottom 60 pixels to remove watermark (768x768 -> 768x708)
-    const processedBuffer = await sharp(response.data)
-      .extract({ left: 0, top: 0, width: 768, height: 708 })
-      .toBuffer();
-
-    const base64Image = processedBuffer.toString('base64');
+    const processedBuffer = response.data;
+    const base64Image = Buffer.from(processedBuffer).toString('base64');
     const imageDataUrl = `data:image/jpeg;base64,${base64Image}`;
 
-    // GENERATE ROOM BREAKDOWN
-    // Parse features from the comma-separated string provided by the client
+    // --- STEP 3: LOGICAL DATA BREAKDOWN ---
+    // This ensures the JSON data matches the visual output logic
     const layoutBreakdown = generateRoomBreakdown({
       ...details,
       featuresList: details && details.features ? details.features.split(',').map(f => f.trim()) : []
     });
 
-    console.log('Floor plan processed and generated successfully');
     res.json({
       image: imageDataUrl,
-      layout_breakdown: layoutBreakdown
+      layout_breakdown: layoutBreakdown,
+      status: "success"
     });
 
   } catch (error) {
     console.error('Error generating floor plan:', error.message);
-
-    if (error.code === 'ECONNABORTED') {
-      return res.status(504).json({
-        error: 'Generation timed out. The model is taking longer than expected.'
-      });
-    }
-
-    if (error.response && error.response.data) {
-      try {
-        const errorJson = JSON.parse(Buffer.from(error.response.data).toString());
-        if (errorJson.error && errorJson.error.includes('loading')) {
-          return res.status(503).json({
-            error: 'Model is loading. Please try again in 30 seconds.',
-            details: errorJson
-          });
-        }
-      } catch (e) { }
-    }
-
     res.status(500).json({
       error: `Error generating floor plan: ${error.message}`,
     });
   }
 });
 
+// Helper function to calculate room sizes based on total sqFeet
 function generateRoomBreakdown(details) {
   const { sqFeet = 1500, bedrooms = 3, bathrooms = 2, featuresList = [] } = details;
   const rooms = [];
 
-  // Base internal area calculation
-  let remainingSqFt = parseInt(sqFeet) * 0.90; // Keep 10% for walls/circulation
+  // Reserve 10% for walls/hallways
+  let remainingSqFt = parseInt(sqFeet) * 0.90;
 
-  // Helper to generate dimensions roughly matching an area
   const getDims = (area) => {
     const width = Math.floor(Math.sqrt(area));
     const length = Math.floor(area / width);
     return `${width}' x ${length}'`;
-  }
+  };
 
-  // 1. Always add Bedrooms
-  // Master Bedroom (approx 15% of total)
+  // Master Bedroom (approx 15% of space)
   const masterArea = Math.floor(parseInt(sqFeet) * 0.15);
   rooms.push({ name: "Master Bedroom", area: masterArea, dimensions: getDims(masterArea) });
   remainingSqFt -= masterArea;
@@ -103,7 +105,6 @@ function generateRoomBreakdown(details) {
   // Other Bedrooms
   const otherBedroomsCount = Math.max(0, parseInt(bedrooms) - 1);
   if (otherBedroomsCount > 0) {
-    // Allocate about 12% per extra bedroom
     const bedArea = Math.floor(parseInt(sqFeet) * 0.12);
     for (let i = 1; i <= otherBedroomsCount; i++) {
       rooms.push({ name: `Bedroom ${i}`, area: bedArea, dimensions: getDims(bedArea) });
@@ -111,25 +112,19 @@ function generateRoomBreakdown(details) {
     }
   }
 
-  // 2. Always add Bathrooms
-  const bathArea = 60; // Standard size
+  // Bathrooms
+  const bathArea = 60;
   for (let i = 1; i <= parseInt(bathrooms); i++) {
     rooms.push({ name: `Bathroom ${i}`, area: bathArea, dimensions: "8' x 7'" });
     remainingSqFt -= bathArea;
   }
 
-  // 3. Process Selected Features
-  // Map common features to approximate sizes relative to total sqFeet or fixed sizes
-  // Note: we use the feature names exactly as they might come from the client or mapped nicely
-
+  // Dynamic Features
   featuresList.forEach(feature => {
     const normalizeFeature = feature.toLowerCase().replace(/\s+/g, '');
     let itemArea = 0;
-    let displayName = feature; // Default to utilizing the provided name
+    let displayName = feature.charAt(0).toUpperCase() + feature.slice(1);
     let isExternal = false;
-
-    // Capitalize first letter for display if it's lowercase
-    displayName = feature.charAt(0).toUpperCase() + feature.slice(1);
 
     if (normalizeFeature.includes('kitchen')) {
       itemArea = Math.floor(parseInt(sqFeet) * 0.12);
@@ -139,33 +134,19 @@ function generateRoomBreakdown(details) {
     } else if (normalizeFeature.includes('dining')) {
       displayName = "Dining Room";
       itemArea = Math.floor(parseInt(sqFeet) * 0.10);
-    } else if (normalizeFeature.includes('office')) {
-      itemArea = Math.floor(parseInt(sqFeet) * 0.08);
     } else if (normalizeFeature.includes('garage')) {
-      itemArea = 400; // Standard 2-car
-      isExternal = true; // Usually doesn't count against internal sqft
-    } else if (normalizeFeature.includes('balcony')) {
-      itemArea = 80;
+      itemArea = 400;
       isExternal = true;
-    } else if (normalizeFeature.includes('garden')) {
-      itemArea = 500; // Arbitrary nice size
-      isExternal = true;
-    } else if (normalizeFeature.includes('pool')) {
-      itemArea = 450;
+    } else if (normalizeFeature.includes('balcony') || normalizeFeature.includes('deck')) {
+      itemArea = 100;
       isExternal = true;
     } else {
-      // Fallback for unknown features
-      itemArea = 100;
+      itemArea = 100; // Default for study, prayer room, etc.
     }
 
-    // Only subtract from remaining interior sqft if it's an internal room
     if (!isExternal) {
-      // If we represent it, subtract it, but don't go below zero logic (just let it be loose)
       remainingSqFt -= itemArea;
     }
-
-    // Avoid duplicates if logic above somehow added them (though we removed hardcoded kitchen/living)
-    // We only have Bedrooms/Bathrooms hardcoded now.
     rooms.push({ name: displayName, area: itemArea, dimensions: getDims(itemArea) });
   });
 

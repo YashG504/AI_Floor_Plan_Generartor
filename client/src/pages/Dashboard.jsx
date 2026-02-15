@@ -1,5 +1,6 @@
 import { useState, useContext } from 'react';
-import { Home, Bath, Layers, Box, TreeDeciduous, Palmtree, Flower2, Monitor, School, Building2, Warehouse, Sun, Moon } from 'lucide-react';
+import { Home, Bath, Layers, Box, TreeDeciduous, Palmtree, Flower2, Monitor, School, Building2, Warehouse, Sun, Moon, Compass, MessageSquare, Send } from 'lucide-react';
+//chud gaya
 import AuthContext from '../context/AuthContext';
 import ThemeContext from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +22,12 @@ const Dashboard = () => {
   const [layoutType, setLayoutType] = useState('Open Concept');
   const [archStyle, setArchStyle] = useState('Modern');
   const [renderStyle, setRenderStyle] = useState('Photorealistic 3D');
+  const [entryDirection, setEntryDirection] = useState('North');
+  const [vastuCompliant, setVastuCompliant] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatHistory, setChatHistory] = useState([
+    { role: 'ai', text: 'Hi! I can help you modify the plan. Try "add a garage" or "change to south facing".' }
+  ]);
   const [generationInProgress, setGenerationInProgress] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [generatedLayout, setGeneratedLayout] = useState(null);
@@ -58,7 +65,25 @@ const Dashboard = () => {
       .map(([name, _]) => name)
       .join(', ');
 
-    const prompt = `top-down 3D floor plan, ${bedrooms} bedrooms, ${bathrooms} bathrooms, ${sqFeet} sq ft, ${layoutType} layout, ${archStyle} style, ${renderStyle}, with ${selectedFeatures}, white background, clear room labels`;
+    // Prompt Engineering for 2D vs 3D
+    let stylePrompt = '';
+    if (renderStyle === 'Blueprint' || renderStyle === 'Sketch') {
+      // 2D Mode (High Quality CAD)
+      stylePrompt = 'technical architectural floor plan, professional CAD drawing, top-down view, distinct wall thickness, furniture layout, clearly defined rooms, clean lines, high contrast black and white, architectural standard symbols, no shading, schematic diagram';
+    } else {
+      // 3D Mode (Photorealistic)
+      stylePrompt = '3D floor plan rendering of a modern apartment, isometric interior view, high detail, photorealistic materials, bright studio lighting, soft shadows, ambient occlusion, extensive realistic furniture, 8k resolution, sharp focus, architectural visualization, clear room layout, white background';
+    }
+
+    // Floor logic
+    const floorPrompt = floors > 1 ? `2-story layout (Ground floor and 1st floor layouts side-by-side or stacked), detailed` : 'Single story layout';
+
+    // Vastu & Direction logic
+    const vastuPrompt = vastuCompliant
+      ? `Vastu Shastra compliant (Kitchen in South-East, Master Bedroom in South-West, Entrance from ${entryDirection})`
+      : `${entryDirection}-facing main entrance`;
+
+    const prompt = `${stylePrompt}, ${floorPrompt}, ${bedrooms} bedrooms, ${bathrooms} bathrooms, ${sqFeet} sq ft total area, ${layoutType} layout, ${archStyle} architectural style. Features: ${selectedFeatures}. ${vastuPrompt}. clean white background, clear text labels for every room.`;
 
     try {
       const response = await api.post('/generate-floorplan', {
@@ -83,6 +108,52 @@ const Dashboard = () => {
       );
     } finally {
       setGenerationInProgress(false);
+    }
+  };
+
+  // Simple Regex Chat Parser
+  const handleChatSubmit = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const input = chatInput.toLowerCase();
+    const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
+    let response = "I've updated the plan based on your request. Click 'Generate' to see changes.";
+
+    // Parse commands
+    if (input.includes('bedroom')) {
+      const num = input.match(/\d+/);
+      if (num) setBedrooms(parseInt(num[0]));
+      else if (input.includes('add')) setBedrooms(b => b + 1);
+      else if (input.includes('remove')) setBedrooms(b => Math.max(1, b - 1));
+    }
+
+    if (input.includes('bathroom')) {
+      const num = input.match(/\d+/);
+      if (num) setBathrooms(parseInt(num[0]));
+      else if (input.includes('add')) setBathrooms(b => b + 1);
+    }
+
+    if (input.includes('garage')) setFeatures(f => ({ ...f, garage: !input.includes('remove') }));
+    if (input.includes('pool')) setFeatures(f => ({ ...f, pool: !input.includes('remove') }));
+    if (input.includes('garden')) setFeatures(f => ({ ...f, garden: !input.includes('remove') }));
+
+    if (input.includes('vastu')) {
+      setVastuCompliant(!input.includes('remove') && !input.includes('no'));
+      response = input.includes('no') ? "Vastu mode disabled." : "Vastu mode enabled.";
+    }
+
+    if (input.includes('north')) setEntryDirection('North');
+    if (input.includes('south')) setEntryDirection('South');
+    if (input.includes('east')) setEntryDirection('East');
+    if (input.includes('west')) setEntryDirection('West');
+
+    setChatHistory([...newHistory, { role: 'ai', text: response }]);
+    setChatInput('');
+
+    // Auto-regenerate if requested
+    if (input.includes('generate') || input.includes('update') || input.includes('show')) {
+      handleGenerateFloorPlan();
     }
   };
 
@@ -165,6 +236,24 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* Entry & Vastu */}
+            <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Orientation & Vastu</h4>
+              <div className="mb-3">
+                <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1 flex items-center gap-1"><Compass size={12} /> Main Entry Facing</label>
+                <select value={entryDirection} onChange={(e) => setEntryDirection(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                </select>
+              </div>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" checked={vastuCompliant} onChange={() => setVastuCompliant(!vastuCompliant)} className="rounded border-slate-400 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-blue-500 focus:ring-blue-500" />
+                <span className="text-sm text-slate-700 dark:text-slate-300">Enable Vastu Compliance</span>
+              </label>
+            </div>
+
             {/* Style & Render */}
             <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
               <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Style & Render</h4>
@@ -203,6 +292,28 @@ const Dashboard = () => {
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Chatbot Interface */}
+            <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/80 mb-6">
+              <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2"><MessageSquare size={14} /> AI Assistant</h4>
+              <div className="h-40 overflow-y-auto mb-3 p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 text-xs space-y-2">
+                {chatHistory.map((msg, idx) => (
+                  <div key={idx} className={`p-2 rounded ${msg.role === 'ai' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ml-4'}`}>
+                    <strong>{msg.role === 'ai' ? 'AI' : 'You'}:</strong> {msg.text}
+                  </div>
+                ))}
+              </div>
+              <form onSubmit={handleChatSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type updates (e.g. 'add a pool')..."
+                  className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded p-2 text-xs outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
+                />
+                <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded transition"><Send size={14} /></button>
+              </form>
             </div>
 
             <button
