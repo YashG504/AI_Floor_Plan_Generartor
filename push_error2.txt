@@ -1,0 +1,91 @@
+﻿git : remote: error: GH013: 
+Repository rule violations found 
+for refs/heads/main.        
+At line:1 char:1
++ git push origin main 2>&1 | 
+Out-File -Encoding utf8 
+push_error2.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSp 
+   ecified: (remote: error: ...s/m  
+  ain.        :String) [], Remote   
+ Exception
+    + FullyQualifiedErrorId : Nativ 
+   eCommandError
+ 
+remote: 
+remote: - GITHUB PUSH PROTECTION    
+    
+remote:   ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇ
+öΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö        
+remote:     Resolve the following 
+violations before pushing again     
+   
+remote: 
+remote:     - Push cannot contain 
+secrets        
+remote: 
+remote:             
+remote:      (?) Learn how to 
+resolve a blocked push        
+remote:      https://docs.github.com
+/code-security/secret-scanning/worki
+ng-with-secret-scanning-and-push-pro
+tection/working-with-push-protection
+-from-the-command-line#resolving-a-b
+locked-push        
+remote:             
+remote:             
+remote:       ΓÇöΓÇö Replicate API 
+Token ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö
+ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö
+ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö        
+remote:        locations:        
+remote:          - commit: b89a3aebb
+66197c623c982919ff460f9aedf05f6     
+   
+remote:            path: 
+server/.env:7        
+remote:             
+remote:        (?) To push, remove 
+secret from commit(s) or follow 
+this URL to allow the secret.       
+ 
+remote:        https://github.com/Ya
+shG504/AI_Floor_Plan_Generartor/secu
+rity/secret-scanning/unblock-secret/
+3ALtqlJ6TDI4XaMCkwv2rQZgaco        
+remote:             
+remote:             
+remote:       ΓÇöΓÇö Hugging Face 
+User Access Token ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö
+ΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇöΓÇö
+ΓÇöΓÇö        
+remote:        locations:        
+remote:          - commit: b89a3aebb
+66197c623c982919ff460f9aedf05f6     
+   
+remote:            path: 
+server/.env:8        
+remote:             
+remote:        (?) To push, remove 
+secret from commit(s) or follow 
+this URL to allow the secret.       
+ 
+remote:        https://github.com/Ya
+shG504/AI_Floor_Plan_Generartor/secu
+rity/secret-scanning/unblock-secret/
+3ALtqlOFwaoEV5ag6TV0IEKL18U        
+remote:             
+remote: 
+remote: 
+To https://github.com/YashG504/AI_Fl
+oor_Plan_Generartor.git
+ ! [remote rejected] main -> main 
+(push declined due to repository 
+rule violations)
+error: failed to push some refs to '
+https://github.com/YashG504/AI_Floor
+_Plan_Generartor.git'

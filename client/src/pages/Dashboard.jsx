@@ -1,6 +1,5 @@
 import { useState, useContext } from 'react';
 import { Home, Bath, Layers, Box, TreeDeciduous, Palmtree, Flower2, Monitor, School, Building2, Warehouse, Sun, Moon, Compass, MessageSquare, Send } from 'lucide-react';
-//chud gaya
 import AuthContext from '../context/AuthContext';
 import ThemeContext from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -24,16 +23,16 @@ const Dashboard = () => {
   const [renderStyle, setRenderStyle] = useState('Photorealistic 3D');
   const [entryDirection, setEntryDirection] = useState('North');
   const [vastuCompliant, setVastuCompliant] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('flux');
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: 'Hi! I can help you modify the plan. Try "add a garage" or "change to south facing".' }
+    { role: 'ai', text: 'Hi! I can help you modify the plan. Powered by Stability Diffusion Model. Try "add a garage" or "change to south facing".' }
   ]);
   const [generationInProgress, setGenerationInProgress] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [generatedLayout, setGeneratedLayout] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // UI State for checkboxes
   const [features, setFeatures] = useState({
     kitchen: true,
     livingRoom: true,
@@ -59,59 +58,25 @@ const Dashboard = () => {
     setErrorMessage(null);
     setGeneratedImage(null);
 
-    // Build prompt from parameters
     const selectedFeatures = Object.entries(features)
       .filter(([_, selected]) => selected)
-      .map(([name, _]) => name)
+      .map(([name]) => name)
       .join(', ');
-
-    // Prompt Engineering for 2D vs 3D
-    let stylePrompt = '';
-    if (renderStyle === 'Blueprint' || renderStyle === 'Sketch') {
-      // 2D Mode (High Quality CAD)
-      stylePrompt = 'technical architectural floor plan, professional CAD drawing, top-down view, distinct wall thickness, furniture layout, clearly defined rooms, clean lines, high contrast black and white, architectural standard symbols, no shading, schematic diagram';
-    } else {
-      // 3D Mode (Photorealistic)
-      stylePrompt = '3D floor plan rendering of a modern apartment, isometric interior view, high detail, photorealistic materials, bright studio lighting, soft shadows, ambient occlusion, extensive realistic furniture, 8k resolution, sharp focus, architectural visualization, clear room layout, white background';
-    }
-
-    // Floor logic
-    const floorPrompt = floors > 1 ? `2-story layout (Ground floor and 1st floor layouts side-by-side or stacked), detailed` : 'Single story layout';
-
-    // Vastu & Direction logic
-    const vastuPrompt = vastuCompliant
-      ? `Vastu Shastra compliant (Kitchen in South-East, Master Bedroom in South-West, Entrance from ${entryDirection})`
-      : `${entryDirection}-facing main entrance`;
-
-    const prompt = `${stylePrompt}, ${floorPrompt}, ${bedrooms} bedrooms, ${bathrooms} bathrooms, ${sqFeet} sq ft total area, ${layoutType} layout, ${archStyle} architectural style. Features: ${selectedFeatures}. ${vastuPrompt}. clean white background, clear text labels for every room.`;
 
     try {
       const response = await api.post('/generate-floorplan', {
-        prompt: prompt,
-        details: {
-          bedrooms,
-          bathrooms,
-          sqFeet,
-          layoutType,
-          archStyle,
-          features: selectedFeatures
-        }
+        model: selectedModel,
+        details: { bedrooms, bathrooms, sqFeet, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection }
       });
-
       setGeneratedImage(response.data.image);
       setGeneratedLayout(response.data.layout_breakdown);
     } catch (error) {
-      console.error('Error generating floor plan:', error);
-      setErrorMessage(
-        error.response?.data?.error ||
-        'Failed to generate floor plan. Please try again.'
-      );
+      setErrorMessage(error.response?.data?.error || 'Failed to generate floor plan. Please try again.');
     } finally {
       setGenerationInProgress(false);
     }
   };
 
-  // Simple Regex Chat Parser
   const handleChatSubmit = (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -120,29 +85,24 @@ const Dashboard = () => {
     const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
     let response = "I've updated the plan based on your request. Click 'Generate' to see changes.";
 
-    // Parse commands
     if (input.includes('bedroom')) {
       const num = input.match(/\d+/);
       if (num) setBedrooms(parseInt(num[0]));
       else if (input.includes('add')) setBedrooms(b => b + 1);
       else if (input.includes('remove')) setBedrooms(b => Math.max(1, b - 1));
     }
-
     if (input.includes('bathroom')) {
       const num = input.match(/\d+/);
       if (num) setBathrooms(parseInt(num[0]));
       else if (input.includes('add')) setBathrooms(b => b + 1);
     }
-
     if (input.includes('garage')) setFeatures(f => ({ ...f, garage: !input.includes('remove') }));
     if (input.includes('pool')) setFeatures(f => ({ ...f, pool: !input.includes('remove') }));
     if (input.includes('garden')) setFeatures(f => ({ ...f, garden: !input.includes('remove') }));
-
     if (input.includes('vastu')) {
       setVastuCompliant(!input.includes('remove') && !input.includes('no'));
-      response = input.includes('no') ? "Vastu mode disabled." : "Vastu mode enabled.";
+      response = input.includes('no') ? 'Vastu mode disabled.' : 'Vastu mode enabled.';
     }
-
     if (input.includes('north')) setEntryDirection('North');
     if (input.includes('south')) setEntryDirection('South');
     if (input.includes('east')) setEntryDirection('East');
@@ -151,21 +111,19 @@ const Dashboard = () => {
     setChatHistory([...newHistory, { role: 'ai', text: response }]);
     setChatInput('');
 
-    // Auto-regenerate if requested
-    if (input.includes('generate') || input.includes('update') || input.includes('show')) {
-      handleGenerateFloorPlan();
-    }
+    if (input.includes('generate') || input.includes('update') || input.includes('show')) handleGenerateFloorPlan();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-white font-sans p-6 transition-colors duration-300">
+    <div className="min-h-screen bg-[#f5f5dc] dark:bg-slate-900 text-slate-900 dark:text-white font-sans p-6 transition-colors duration-300">
       {/* Header */}
       <header className="flex justify-between items-center mb-8">
         <div className="text-center w-full relative">
           <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center gap-3">
             <Home className="text-blue-500" /> ResiPlan AI
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">Design your dream home with AI-powered architectural sketches</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Design your dream home with AI-powered architectural sketches</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">Powered by Stability Diffusion Model</p>
 
           <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-4">
             <button
@@ -182,7 +140,7 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* Left Controls Panel */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-3 space-y-6">
           <div className="bg-white dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
               <Box className="w-5 h-5 text-blue-500 dark:text-blue-400" /> House Parameters
@@ -266,18 +224,18 @@ const Dashboard = () => {
                   <option>Industrial</option>
                 </select>
               </div>
-              <div className="mb-1">
+              <div className="mb-4">
                 <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Render Style</label>
                 <select value={renderStyle} onChange={(e) => setRenderStyle(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
                   <option>Photorealistic 3D</option>
-                  <option>Blueprint</option>
                   <option>Sketch</option>
                 </select>
               </div>
+
             </div>
 
             {/* Rooms & Features */}
-            <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+            <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg mb-6">
               <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Rooms & Features</h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {Object.keys(features).map((key) => (
@@ -293,6 +251,7 @@ const Dashboard = () => {
                 ))}
               </div>
             </div>
+
 
             {/* Chatbot Interface */}
             <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/80 mb-6">
@@ -334,8 +293,40 @@ const Dashboard = () => {
         </div>
 
         {/* Right Preview Panel */}
-        <div className="lg:col-span-8">
-          <div className="bg-white dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 h-full min-h-[600px] flex items-center justify-center relative shadow-sm">
+        <div className="lg:col-span-9">
+          <div className="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 h-full min-h-[600px] flex items-center justify-center relative shadow-sm">
+
+            {/* Compass & Vastu Indicator */}
+            <div className="absolute top-5 right-5 z-10 flex flex-col items-center gap-2">
+              {/* Compass Rose */}
+              <div className="relative w-20 h-20 bg-white dark:bg-slate-700 rounded-full border-2 border-blue-300 dark:border-blue-500 shadow-lg flex items-center justify-center">
+                {/* Cardinal Directions */}
+                {['N', 'E', 'S', 'W'].map((dir, i) => {
+                  const angles = { N: 'top-1 left-1/2 -translate-x-1/2', E: 'right-1 top-1/2 -translate-y-1/2', S: 'bottom-1 left-1/2 -translate-x-1/2', W: 'left-1 top-1/2 -translate-y-1/2' };
+                  const dirMap = { N: 'North', E: 'East', S: 'South', W: 'West' };
+                  const isSelected = entryDirection === dirMap[dir];
+                  return (
+                    <span key={dir} className={`absolute text-[11px] font-bold ${angles[dir]} ${isSelected ? 'text-blue-500 dark:text-blue-400 scale-125' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {dir}
+                    </span>
+                  );
+                })}
+                {/* Center dot */}
+                <div className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400" />
+                {/* Arrow pointing to entry direction */}
+                <div className={`absolute w-0.5 h-6 bg-red-500 rounded-full origin-bottom ${entryDirection === 'North' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-0' :
+                  entryDirection === 'East' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-90' :
+                    entryDirection === 'South' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-180' :
+                      'bottom-1/2 left-1/2 -translate-x-1/2 -rotate-90'
+                  }`} />
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{entryDirection} Entry</p>
+              {vastuCompliant && (
+                <div className="text-[10px] bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700 rounded-full px-2 py-0.5 font-semibold">
+                  ✓ Vastu
+                </div>
+              )}
+            </div>
 
             {/* Error State */}
             {errorMessage && (
@@ -364,11 +355,11 @@ const Dashboard = () => {
 
             {/* Generated Image */}
             {generatedImage && !generationInProgress && !errorMessage && (
-              <div className="flex flex-col items-center w-full h-full p-4">
+              <div className="flex flex-col items-center justify-center w-full p-4">
                 <img
                   src={generatedImage}
                   alt="Generated Floor Plan"
-                  className="max-w-full max-h-[60vh] object-contain mb-16 rounded shadow-lg border border-slate-200 dark:border-slate-700"
+                  className="w-full h-full max-h-[75vh] object-contain rounded-lg shadow-2xl border border-slate-200 dark:border-slate-700"
                 />
 
                 {/* Generated Breakdown */}
