@@ -27,7 +27,7 @@ app.use('/api/auth', authRoutes);
 app.post('/api/generate-floorplan', async (req, res) => {
   try {
     const { model, details } = req.body;
-    const { bedrooms, bathrooms, sqFeet, layoutType, archStyle, renderStyle, features: featureList, entryDirection } = details || {};
+    const { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: featureList, entryDirection } = details || {};
 
     const numBedrooms = parseInt(bedrooms) || 1;
     const numBathrooms = parseInt(bathrooms) || 1;
@@ -35,46 +35,76 @@ app.post('/api/generate-floorplan', async (req, res) => {
 
     const activeModel = isSketch ? 'flux-realism' : (model || 'flux');
 
+    // --- Build EXACT room inventory from user selections ---
+    const featureIncludeMap = {
+      kitchen: '[1] modern kitchen',
+      livingRoom: '[1] open-plan living room with miniature scaled sofas',
+      diningRoom: '[1] dining area',
+      office: '[1] home office',
+      garage: '[1] garage',
+      balcony: '[1] balcony',
+      garden: '[1] outdoor garden',
+      pool: '[1] outdoor patio with a pool'
+    };
+    const featureExcludeMap = {
+      kitchen: 'kitchen', livingRoom: 'living room', diningRoom: 'dining room',
+      office: 'home office', garage: 'garage, cars', balcony: 'balcony', garden: 'garden, outdoor plants, landscaping', pool: 'swimming pool, water'
+    };
+    const allFeatureKeys = Object.keys(featureIncludeMap);
+    const selectedFeatureKeys = featureList ? featureList.split(',').map(f => f.trim()) : [];
+
+    // Build exact room list
+    const exactRooms = [];
+    exactRooms.push(`[${numBedrooms}] distinct bedrooms with beds`);
+    exactRooms.push(`[${numBathrooms}] separate bathrooms`);
+    selectedFeatureKeys.forEach(key => {
+      if (featureIncludeMap[key]) exactRooms.push(featureIncludeMap[key]);
+    });
+    const roomListStr = exactRooms.join(', ');
+
+    // Build strict exclude list
+    const excludedItems = allFeatureKeys
+      .filter(key => !selectedFeatureKeys.includes(key))
+      .map(key => featureExcludeMap[key]);
+    excludedItems.push('stairs', 'staircase', 'second floor', 'upper level', 'roof elements');
+    const excludeStr = excludedItems.join(', ');
+
+    const entryContext = entryDirection ? `Main entry door facing ${entryDirection}.` : '';
+
     let stylePrompt = '';
     if (isSketch) {
-      stylePrompt = 'wide angle full view, professional 2D marketing floor plan, Nordic style, completely visible exterior walls, perfectly joined thick dark blue walls, logical room alignment, light gray flooring, top-down vector view, minimalist clean aesthetic, high-quality architectural visualization, simple furniture icons, no perspective, flat colors, white background, HUGE BOLD CLEAR TEXT LABELS INSIDE EVERY ROOM';
+      stylePrompt = `A simple, clean 2D top-down architectural floor plan technical drawing of a ${sqFeet} sqft single level layout. Pure flat 2D projection, no 3D, no perspective. Simple black and white blueprint style. Thick solid dark walls separating every room clearly. Transparent or white floor backgrounds. Simple minimalist geometric icons for furniture (like beds and tables). Minimal detail, sharp clean vector-like lines. Professional architectural schematic, flat orthographic and proper straight lines.`;
     } else {
-      stylePrompt = 'stunning isometric 3D architectural rendering of a complete home floor plan, dollhouse view, angled cutaway perspective, high angular camera, photorealistic, raytracing, 8k resolution. ENTIRE BUILDING FITS FULLY INSIDE THE IMAGE WITH WIDE MARGINS. Outer walls fully visible inside the frame without cropping, completely zoomed out. High-quality realistic natural lighting, thick sturdy external walls, perfectly aligned rooms, seamless layout. Crisp dark studio background, highly detailed minimalist furniture, BOLD HUGE TYPOGRAPHY LABELS CLEARLY WRITTEN ON THE FLOOR OF EACH ROOM';
+      stylePrompt = `A photorealistic, top-down orthographic 3D architectural floor plan of a modern home. The floor plan is floating, viewed from directly above with no roof (antigravity cutaway view). The layout is a complex, multi-room structure with distinct, solid interior walls separating each section. Highly accurate architectural scaling, small precisely scaled furniture. High-end V-Ray 3D render, soft ambient lighting, clean lines, floating over a smooth neutral background, masterpiece architectural visualization.`;
     }
 
-    const spatialRooms = [];
-    spatialRooms.push('central open-plan living room seamlessly connected directly perfectly joined to the kitchen');
-    for (let i = 0; i < numBedrooms; i++) {
-      spatialRooms.push(`well-aligned ${i === 0 ? 'Master Bedroom with wardrobe' : `Bedroom ${i + 1}`} properly connected to hallway`);
-    }
-    for (let i = 0; i < numBathrooms; i++) {
-      spatialRooms.push(`Bathroom ${i + 1} correctly adjacent and perfectly joined to rooms`);
-    }
-    const spatialLayout = spatialRooms.join(', ');
+    const finalPrompt = `${stylePrompt} ${entryContext} Strictly includes: ${roomListStr}. DO NOT include: ${excludeStr}. NO ROOF. NO SECOND FLOOR. NO STAIRS. Every room separated by solid walls. Single level ground floor only.`;
 
-    const featureContext = featureList ? `also logically place and include ${featureList}` : '';
-    const entryContext = entryDirection ? `The main entry gate and driveway must be prominently facing ${entryDirection}.` : '';
-
-    let explicitLabels = `"Living Room", "Kitchen"`;
-    for (let i = 1; i <= numBedrooms; i++) explicitLabels += `, "Bedroom ${i}"`;
-    for (let i = 1; i <= numBathrooms; i++) explicitLabels += `, "Bathroom ${i}"`;
-    if (featureList) explicitLabels += `, ${featureList.split(',').map(f => `"${f.trim()}"`).join(', ')}`;
-
-    const finalPrompt = `${stylePrompt}, ${archStyle || 'modern'} style architecture. ${entryContext} The floor plan exact continuous layout must include: [${spatialLayout}]. Precisely scaled perfectly aligned rooms, proper wall connections between all separate rooms without breaking walls, ${sqFeet} sqft total scale, ${layoutType} spatial flow, ${featureContext}, highly consistent structural walls. KEEP THE ENTIRE HOUSE CENTERED AND VISIBLE. CRITICAL INSTRUCTION: YOU MUST DRAW LARGE TYPOGRAPHY TEXT LABELS INSIDE EVERY SINGLE ROOM. THE TEXT MUST SPELL OUT: ${explicitLabels}.`;
+    console.log('\n=== FLOOR PLAN PROMPT ===');
+    console.log('Selected features:', selectedFeatureKeys);
+    console.log('Rooms:', exactRooms);
+    console.log('Excluded:', excludedItems);
+    console.log('Prompt length:', finalPrompt.length);
+    console.log('Prompt:', finalPrompt);
+    console.log('========================\n');
 
     //const API_KEY = process.env.STABILITY_API_KEY;
 
     const rawSqFt = parseInt(sqFeet) || 1000;
     const totalSqFt = Math.max(800, Math.min(rawSqFt, 5000));
 
-    const breakdown = [
-      { name: 'Living Area', percentage: 0.30 },
-      { name: 'Kitchen & Dining', percentage: 0.20 },
-    ];
-
+    const breakdown = [];
+    // Only add rooms that are actually selected
+    if (selectedFeatureKeys.includes('livingRoom')) breakdown.push({ name: 'Living Area', percentage: 0.25 });
+    if (selectedFeatureKeys.includes('kitchen')) breakdown.push({ name: 'Kitchen', percentage: 0.12 });
+    if (selectedFeatureKeys.includes('diningRoom')) breakdown.push({ name: 'Dining Room', percentage: 0.10 });
     for (let i = 1; i <= numBedrooms; i++) breakdown.push({ name: `Bedroom ${i}`, percentage: 0.15 / (numBedrooms / 2 || 1) });
     for (let i = 1; i <= numBathrooms; i++) breakdown.push({ name: `Bathroom ${i}`, percentage: 0.08 / (numBathrooms / 2 || 1) });
-    if (featureList?.includes('garage')) breakdown.push({ name: 'Garage', percentage: 0.15 });
+    if (selectedFeatureKeys.includes('office')) breakdown.push({ name: 'Office', percentage: 0.08 });
+    if (selectedFeatureKeys.includes('garage')) breakdown.push({ name: 'Garage', percentage: 0.15 });
+    if (selectedFeatureKeys.includes('balcony')) breakdown.push({ name: 'Balcony', percentage: 0.05 });
+    if (selectedFeatureKeys.includes('garden')) breakdown.push({ name: 'Garden', percentage: 0.10 });
+    if (selectedFeatureKeys.includes('pool')) breakdown.push({ name: 'Pool', percentage: 0.10 });
 
     const layout_breakdown = breakdown.map(room => {
       const area = Math.round(totalSqFt * room.percentage);
@@ -84,44 +114,96 @@ app.post('/api/generate-floorplan', async (req, res) => {
       return { name: room.name, area, dimensions: `${dim1}' x ${dim2}'` };
     });
 
-    // Pollinations AI Implementation (Commented out per request)
-    /*
-    const response = await axios.get(
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt.substring(0, 800))}`,
-      {
-        params: { width: 1024, height: 1024, nologo: true, seed: Math.floor(Math.random() * 1000000) },
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-        responseType: 'arraybuffer'
-      }
-    );
-    */
-
-    // Hugging Face Implementation
+    // --- Generate Image ---
     const HF_API_KEY = process.env.HF_API_KEY;
-
     if (!HF_API_KEY) {
-      return res.status(500).json({
-        error: 'Missing Hugging Face API Key',
-        details: 'Please add HF_API_KEY to your .env file.'
-      });
+      return res.status(500).json({ error: 'Missing Hugging Face API Key', details: 'Please add HF_API_KEY to your .env file.' });
     }
-
     const hf = new HfInference(HF_API_KEY);
 
-    const blob = await hf.textToImage({
-      model: 'black-forest-labs/FLUX.1-schnell',
-      inputs: finalPrompt.substring(0, 800),
-      parameters: {
-        guidance_scale: 7.5,
-        num_inference_steps: 4
+    const generateImage = async (prompt) => {
+      let base64Image = '';
+      let usedFallback = false;
+
+      if (isSketch) {
+        try {
+          const seed = Math.floor(Math.random() * 1000000);
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.substring(0, 1000))}?width=1024&height=1024&nologo=true&seed=${seed}`;
+          const response = await axios.get(pollinationsUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            responseType: 'arraybuffer',
+            timeout: 15000
+          });
+          const buffer = Buffer.from(response.data, 'binary');
+          base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+        } catch (pollError) {
+          console.warn("Pollinations failed, using HuggingFace...", pollError.message);
+          usedFallback = true;
+        }
       }
+
+      if (!isSketch || usedFallback) {
+        const blob = await hf.textToImage({
+          model: 'black-forest-labs/FLUX.1-schnell',
+          inputs: prompt.substring(0, 800),
+          parameters: { guidance_scale: 7.5, num_inference_steps: 4 }
+        });
+        const arrayBuffer = await blob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        base64Image = `data:${blob.type};base64,${buffer.toString('base64')}`;
+      }
+      return base64Image;
+    };
+
+    // --- Generate and Validate ---
+    let base64Image = await generateImage(finalPrompt);
+
+    // Validation: Use image captioning to check the output
+    let validationPassed = true;
+    let validationNote = '';
+    try {
+      // Convert base64 to blob for captioning
+      const imageData = base64Image.split(',')[1];
+      const imageBuffer = Buffer.from(imageData, 'base64');
+      const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' });
+
+      const caption = await hf.imageToText({
+        model: 'Salesforce/blip-image-captioning-large',
+        data: imageBlob
+      });
+
+      const captionText = (caption?.generated_text || '').toLowerCase();
+      console.log('Image caption:', captionText);
+
+      // Check for obvious mismatches
+      if (captionText.includes('two story') || captionText.includes('two floor') || captionText.includes('stair')) {
+        validationPassed = false;
+        validationNote = 'Detected multi-story elements. Regenerating...';
+      }
+    } catch (valError) {
+      console.warn('Validation skipped:', valError.message);
+      // Don't block on validation failure — just skip it
+    }
+
+    // If validation failed, try one more time with reinforced prompt
+    if (!validationPassed) {
+      console.log('Validation failed, regenerating with reinforced prompt...');
+      const reinforcedPrompt = finalPrompt + ' ABSOLUTELY NO STAIRS. FLAT SINGLE FLOOR BUILDING ONLY. NO SECOND LEVEL.';
+      base64Image = await generateImage(reinforcedPrompt);
+    }
+
+    console.log('Generation complete. Validation:', validationPassed ? 'PASSED' : 'RETRIED');
+
+    res.json({
+      image: base64Image,
+      layout_breakdown,
+      length: parseInt(length) || 40,
+      breadth: parseInt(breadth) || 45,
+      entryDirection: entryDirection || 'North',
+      prompt_used: finalPrompt.substring(0, 200) + '...',
+      validation: validationPassed ? 'passed' : 'retried',
+      status: 'success'
     });
-
-    const arrayBuffer = await blob.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64Image = `data:${blob.type};base64,${buffer.toString('base64')}`;
-
-    res.json({ image: base64Image, layout_breakdown, status: 'success' });
 
   } catch (error) {
     let errorString = error.message;

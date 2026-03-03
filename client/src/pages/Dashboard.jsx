@@ -4,6 +4,7 @@ import AuthContext from '../context/AuthContext';
 import ThemeContext from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import FloorPlanViewer from '../components/FloorPlanViewer';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -17,9 +18,8 @@ const Dashboard = () => {
 
   const [bedrooms, setBedrooms] = useState(3);
   const [bathrooms, setBathrooms] = useState(2);
-  const [floors, setFloors] = useState(1);
-  const [layoutType, setLayoutType] = useState('Open Concept');
-  const [archStyle, setArchStyle] = useState('Modern');
+  const [layoutType] = useState('Open Concept');
+  const [archStyle] = useState('Normal');
   const [renderStyle, setRenderStyle] = useState('Photorealistic 3D');
   const [entryDirection, setEntryDirection] = useState('North');
   const [vastuCompliant, setVastuCompliant] = useState(false);
@@ -66,7 +66,7 @@ const Dashboard = () => {
     try {
       const response = await api.post('/generate-floorplan', {
         model: selectedModel,
-        details: { bedrooms, bathrooms, sqFeet, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection }
+        details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection }
       });
       setGeneratedImage(response.data.image);
       setGeneratedLayout(response.data.layout_breakdown);
@@ -149,7 +149,7 @@ const Dashboard = () => {
             {/* Core Specs */}
             <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
               <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Core Specs</h4>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1 flex items-center gap-1"><Home size={12} /> Bedrooms</label>
                   <input type="number" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
@@ -157,10 +157,6 @@ const Dashboard = () => {
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1 flex items-center gap-1"><Bath size={12} /> Bathrooms</label>
                   <input type="number" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1 flex items-center gap-1"><Layers size={12} /> Floors</label>
-                  <input type="number" value={floors} onChange={(e) => setFloors(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
                 </div>
               </div>
             </div>
@@ -183,15 +179,6 @@ const Dashboard = () => {
                 <span className="text-slate-500 dark:text-slate-300">Total Area</span>
                 <span className="text-blue-600 dark:text-blue-400 font-bold">{sqFeet} sq ft</span>
               </div>
-
-              <div className="mb-1">
-                <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Layout Type</label>
-                <select value={layoutType} onChange={(e) => setLayoutType(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
-                  <option>Open Concept</option>
-                  <option>Traditional</option>
-                  <option>Studio</option>
-                </select>
-              </div>
             </div>
 
             {/* Entry & Vastu */}
@@ -212,20 +199,10 @@ const Dashboard = () => {
               </label>
             </div>
 
-            {/* Style & Render */}
+            {/* Render Style */}
             <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
-              <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Style & Render</h4>
+              <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Render Style</h4>
               <div className="mb-4">
-                <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Architectural Style</label>
-                <select value={archStyle} onChange={(e) => setArchStyle(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
-                  <option>Modern</option>
-                  <option>Contemporary</option>
-                  <option>Minimalist</option>
-                  <option>Industrial</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Render Style</label>
                 <select value={renderStyle} onChange={(e) => setRenderStyle(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
                   <option>Photorealistic 3D</option>
                   <option>Sketch</option>
@@ -355,11 +332,12 @@ const Dashboard = () => {
 
             {/* Generated Image */}
             {generatedImage && !generationInProgress && !errorMessage && (
-              <div className="flex flex-col items-center justify-center w-full p-4">
-                <img
-                  src={generatedImage}
-                  alt="Generated Floor Plan"
-                  className="w-full h-full max-h-[75vh] object-contain rounded-lg shadow-2xl border border-slate-200 dark:border-slate-700"
+              <div className="flex flex-col items-center justify-center w-full p-4 gap-4">
+                <FloorPlanViewer
+                  imageSrc={generatedImage}
+                  length={length}
+                  breadth={breadth}
+                  entryDirection={entryDirection}
                 />
 
                 {/* Generated Breakdown */}
