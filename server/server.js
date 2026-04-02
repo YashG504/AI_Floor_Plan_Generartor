@@ -27,12 +27,21 @@ app.use('/api/auth', authRoutes);
 app.post('/api/generate-floorplan', async (req, res) => {
   try {
     const { model, details } = req.body;
-    const { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: featureList, entryDirection } = details || {};
+    const { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: featureList, entryDirection, vastuCompliant } = details || {};
+
+    const rawLength = parseFloat(length);
+    const rawBreadth = parseFloat(breadth);
+    if (!rawLength || rawLength <= 0 || !rawBreadth || rawBreadth <= 0) {
+      return res.status(400).json({ error: 'Invalid dimensions provided. Length and Breadth must be greater than 0.' });
+    }
 
     const numBedrooms = parseInt(bedrooms) || 1;
     const numBathrooms = parseInt(bathrooms) || 1;
-    const isSketch = renderStyle === 'Sketch' || renderStyle === 'Blueprint';
+    if (numBedrooms <= 0 || numBathrooms < 0) {
+      return res.status(400).json({ error: 'Invalid room counts provided.' });
+    }
 
+    const isSketch = renderStyle === 'Sketch' || renderStyle === 'Blueprint';
     const activeModel = isSketch ? 'flux-realism' : (model || 'flux');
 
     // --- Build EXACT room inventory from user selections ---
@@ -40,23 +49,27 @@ app.post('/api/generate-floorplan', async (req, res) => {
       kitchen: '[1] modern kitchen',
       livingRoom: '[1] open-plan living room with miniature scaled sofas',
       diningRoom: '[1] dining area',
-      office: '[1] home office',
+      office: '[1] dedicated indoor home office room',
       garage: '[1] garage',
       balcony: '[1] balcony',
-      garden: '[1] outdoor garden',
+      garden: '[1] outdoor garden plot adjacent to the house',
       pool: '[1] outdoor patio with a pool'
     };
     const featureExcludeMap = {
       kitchen: 'kitchen', livingRoom: 'living room', diningRoom: 'dining room',
-      office: 'home office', garage: 'garage, cars', balcony: 'balcony', garden: 'garden, outdoor plants, landscaping', pool: 'swimming pool, water'
+      office: 'office, study, workplace', garage: 'garage, cars', balcony: 'balcony', garden: 'garden, outdoor plants, landscaping, outdoors', pool: 'swimming pool, water'
     };
     const allFeatureKeys = Object.keys(featureIncludeMap);
     const selectedFeatureKeys = featureList ? featureList.split(',').map(f => f.trim()) : [];
 
     // Build exact room list
     const exactRooms = [];
-    exactRooms.push(`[${numBedrooms}] distinct bedrooms with beds`);
-    exactRooms.push(`[${numBathrooms}] separate bathrooms`);
+    for (let i = 1; i <= numBedrooms; i++) {
+      exactRooms.push(`Bedroom ${i} with a bed`);
+    }
+    for (let i = 1; i <= numBathrooms; i++) {
+      exactRooms.push(`Bathroom ${i} (en-suite, directly attached to Bedroom ${i}, sharing an internal wall with a connecting door)`);
+    }
     selectedFeatureKeys.forEach(key => {
       if (featureIncludeMap[key]) exactRooms.push(featureIncludeMap[key]);
     });
@@ -66,19 +79,34 @@ app.post('/api/generate-floorplan', async (req, res) => {
     const excludedItems = allFeatureKeys
       .filter(key => !selectedFeatureKeys.includes(key))
       .map(key => featureExcludeMap[key]);
-    excludedItems.push('stairs', 'staircase', 'second floor', 'upper level', 'roof elements');
+    excludedItems.push('stairs', 'staircase', 'second floor', 'upper level', 'roof elements', 'multi-story');
     const excludeStr = excludedItems.join(', ');
 
-    const entryContext = entryDirection ? `Main entry door facing ${entryDirection}.` : '';
-
-    let stylePrompt = '';
-    if (isSketch) {
-      stylePrompt = `A simple, clean 2D top-down architectural floor plan technical drawing of a ${sqFeet} sqft single level layout. Pure flat 2D projection, no 3D, no perspective. Simple black and white blueprint style. Thick solid dark walls separating every room clearly. Transparent or white floor backgrounds. Simple minimalist geometric icons for furniture (like beds and tables). Minimal detail, sharp clean vector-like lines. Professional architectural schematic, flat orthographic and proper straight lines.`;
-    } else {
-      stylePrompt = `A photorealistic, top-down orthographic 3D architectural floor plan of a modern home. The floor plan is floating, viewed from directly above with no roof (antigravity cutaway view). The layout is a complex, multi-room structure with distinct, solid interior walls separating each section. Highly accurate architectural scaling, small precisely scaled furniture. High-end V-Ray 3D render, soft ambient lighting, clean lines, floating over a smooth neutral background, masterpiece architectural visualization.`;
+    // --- Vastu Shastra Constraints ---
+    let vastuPrompt = '';
+    if (vastuCompliant) {
+      const vastuMap = {
+        'East': 'Master bedroom in South-West, Kitchen in South-East, Living room in North-East.',
+        'West': 'Master bedroom in South-West, Kitchen in South-East, Living room in North-East or North-West.'
+      };
+      const cleanDirection = entryDirection ? entryDirection.trim() : 'East';
+      vastuPrompt = `Strictly follow Vastu Shastra architectural principles: ${vastuMap[cleanDirection] || 'Master bedroom in South-West, Kitchen in South-East.'}`;
     }
 
-    const finalPrompt = `${stylePrompt} ${entryContext} Strictly includes: ${roomListStr}. DO NOT include: ${excludeStr}. NO ROOF. NO SECOND FLOOR. NO STAIRS. Every room separated by solid walls. Single level ground floor only.`;
+    const cleanDir = entryDirection ? entryDirection.trim() : 'East';
+    const entryContext = cleanDir ? `Main entry door facing ${cleanDir}. ${vastuPrompt}` : '';
+
+    let finalPrompt = '';
+
+    if (isSketch) {
+      const sketchStyle = `Pure orthogonal 2D CAD floor plan, technical architectural drawing, blueprint style, stark black and white schematic, AutoCAD aesthetic, minimalist drafting. Top-down flat view ONLY. Straight geometric lines, crisp borders, solid black walls on a pure white background. NO colors. NO 3D elements. NO perspective.`;
+      finalPrompt = `${sketchStyle} ${entryContext} Structure must include: ${roomListStr}. DO NOT include: ${excludeStr}. NO photorealism, NO furniture textures, NO 3D rendering, NO shading. Single level ground floor only. Space dimensions: ${rawLength} ft by ${rawBreadth} ft.`;
+    } else {
+      const style3d = `A photorealistic, top-down orthographic 3D architectural floor plan of a modern home. The floor plan is floating, viewed from directly above with no roof (antigravity cutaway view). The layout is a complex, multi-room structure with distinct, solid interior walls separating each section. Highly accurate architectural scaling, small precisely scaled furniture. High-end V-Ray 3D render, soft ambient lighting, clean lines.`;
+      const noOutdoors = (selectedFeatureKeys.includes('garden') || selectedFeatureKeys.includes('pool') || selectedFeatureKeys.includes('balcony')) ? '' : 'NO outdoor landscaping. ';
+      
+      finalPrompt = `${style3d} ${entryContext} Strictly includes: ${roomListStr}. DO NOT include: ${excludeStr}. ${noOutdoors}NO ROOF. NO SECOND FLOOR. NO STAIRS. Every room separated by solid walls. Single level ground floor only. IMPORTANT: Every bathroom must be en-suite — directly attached to a bedroom with a shared internal wall and door, NOT floating or isolated.`;
+    }
 
     console.log('\n=== FLOOR PLAN PROMPT ===');
     console.log('Selected features:', selectedFeatureKeys);
@@ -128,7 +156,8 @@ app.post('/api/generate-floorplan', async (req, res) => {
       if (isSketch) {
         try {
           const seed = Math.floor(Math.random() * 1000000);
-          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.substring(0, 1000))}?width=1024&height=1024&nologo=true&seed=${seed}`;
+          const cleanedPrompt = finalPrompt.replace(/\r?\n|\r/g, ' ').substring(0, 1000); // Remove hidden newlines
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanedPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
           const response = await axios.get(pollinationsUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             responseType: 'arraybuffer',
@@ -143,9 +172,10 @@ app.post('/api/generate-floorplan', async (req, res) => {
       }
 
       if (!isSketch || usedFallback) {
+        const cleanedPromptHF = finalPrompt.replace(/\r?\n|\r/g, ' ').substring(0, 800);
         const blob = await hf.textToImage({
           model: 'black-forest-labs/FLUX.1-schnell',
-          inputs: prompt.substring(0, 800),
+          inputs: cleanedPromptHF,
           parameters: { guidance_scale: 7.5, num_inference_steps: 4 }
         });
         const arrayBuffer = await blob.arrayBuffer();

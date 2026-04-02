@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { Home, Bath, Layers, Box, TreeDeciduous, Palmtree, Flower2, Monitor, School, Building2, Warehouse, Sun, Moon, Compass, MessageSquare, Send } from 'lucide-react';
+import { Home, Bath, Layers, Box, TreeDeciduous, Palmtree, Flower2, Monitor, School, Building2, Warehouse, Sun, Moon, Compass, MessageSquare, Send, Download } from 'lucide-react';
 import AuthContext from '../context/AuthContext';
 import ThemeContext from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ const Dashboard = () => {
   const [layoutType] = useState('Open Concept');
   const [archStyle] = useState('Normal');
   const [renderStyle, setRenderStyle] = useState('Photorealistic 3D');
-  const [entryDirection, setEntryDirection] = useState('North');
+  const [entryDirection, setEntryDirection] = useState('East');
   const [vastuCompliant, setVastuCompliant] = useState(false);
   const [selectedModel, setSelectedModel] = useState('flux');
   const [chatInput, setChatInput] = useState('');
@@ -54,6 +54,11 @@ const Dashboard = () => {
   };
 
   const handleGenerateFloorPlan = async () => {
+    if (length <= 0 || breadth <= 0 || bedrooms <= 0 || bathrooms < 0) {
+      setErrorMessage("Please enter valid positive dimensions and room counts.");
+      return;
+    }
+    
     setGenerationInProgress(true);
     setErrorMessage(null);
     setGeneratedImage(null);
@@ -66,7 +71,7 @@ const Dashboard = () => {
     try {
       const response = await api.post('/generate-floorplan', {
         model: selectedModel,
-        details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection }
+        details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection, vastuCompliant }
       });
       setGeneratedImage(response.data.image);
       setGeneratedLayout(response.data.layout_breakdown);
@@ -75,6 +80,16 @@ const Dashboard = () => {
     } finally {
       setGenerationInProgress(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.href = generatedImage;
+    link.download = renderStyle === 'Sketch' ? 'floor-plan-sketch.jpg' : 'floor-plan-3d.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleChatSubmit = (e) => {
@@ -99,14 +114,25 @@ const Dashboard = () => {
     if (input.includes('garage')) setFeatures(f => ({ ...f, garage: !input.includes('remove') }));
     if (input.includes('pool')) setFeatures(f => ({ ...f, pool: !input.includes('remove') }));
     if (input.includes('garden')) setFeatures(f => ({ ...f, garden: !input.includes('remove') }));
+    if (input.includes('office')) setFeatures(f => ({ ...f, office: !input.includes('remove') }));
+    if (input.includes('kitchen')) setFeatures(f => ({ ...f, kitchen: !input.includes('remove') }));
+    if (input.includes('balcony')) setFeatures(f => ({ ...f, balcony: !input.includes('remove') }));
     if (input.includes('vastu')) {
       setVastuCompliant(!input.includes('remove') && !input.includes('no'));
       response = input.includes('no') ? 'Vastu mode disabled.' : 'Vastu mode enabled.';
     }
-    if (input.includes('north')) setEntryDirection('North');
-    if (input.includes('south')) setEntryDirection('South');
-    if (input.includes('east')) setEntryDirection('East');
-    if (input.includes('west')) setEntryDirection('West');
+    
+    // Direction mapping for East & West only
+    const dirMap = {
+      'east': 'East', 'west': 'West'
+    };
+
+    for (const [key, val] of Object.entries(dirMap)) {
+      if (input.includes(key)) {
+        setEntryDirection(val);
+        break;
+      }
+    }
 
     setChatHistory([...newHistory, { role: 'ai', text: response }]);
     setChatInput('');
@@ -187,8 +213,6 @@ const Dashboard = () => {
               <div className="mb-3">
                 <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1 flex items-center gap-1"><Compass size={12} /> Main Entry Facing</label>
                 <select value={entryDirection} onChange={(e) => setEntryDirection(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
-                  <option>North</option>
-                  <option>South</option>
                   <option>East</option>
                   <option>West</option>
                 </select>
@@ -277,13 +301,16 @@ const Dashboard = () => {
             <div className="absolute top-5 right-5 z-10 flex flex-col items-center gap-2">
               {/* Compass Rose */}
               <div className="relative w-20 h-20 bg-white dark:bg-slate-700 rounded-full border-2 border-blue-300 dark:border-blue-500 shadow-lg flex items-center justify-center">
-                {/* Cardinal Directions */}
-                {['N', 'E', 'S', 'W'].map((dir, i) => {
-                  const angles = { N: 'top-1 left-1/2 -translate-x-1/2', E: 'right-1 top-1/2 -translate-y-1/2', S: 'bottom-1 left-1/2 -translate-x-1/2', W: 'left-1 top-1/2 -translate-y-1/2' };
-                  const dirMap = { N: 'North', E: 'East', S: 'South', W: 'West' };
+                {/* East & West Directions */}
+                {['E', 'W'].map((dir) => {
+                  const angles = { 
+                    E: 'right-1 top-1/2 -translate-y-1/2', 
+                    W: 'left-1 top-1/2 -translate-y-1/2',
+                  };
+                  const dirMap = { E: 'East', W: 'West' };
                   const isSelected = entryDirection === dirMap[dir];
                   return (
-                    <span key={dir} className={`absolute text-[11px] font-bold ${angles[dir]} ${isSelected ? 'text-blue-500 dark:text-blue-400 scale-125' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <span key={dir} className={`absolute text-[10px] sm:text-[11px] font-bold ${angles[dir]} ${isSelected ? 'text-blue-500 dark:text-blue-400 scale-125' : 'text-slate-500 dark:text-slate-400'}`}>
                       {dir}
                     </span>
                   );
@@ -291,10 +318,9 @@ const Dashboard = () => {
                 {/* Center dot */}
                 <div className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400" />
                 {/* Arrow pointing to entry direction */}
-                <div className={`absolute w-0.5 h-6 bg-red-500 rounded-full origin-bottom ${entryDirection === 'North' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-0' :
+                <div className={`absolute w-0.5 h-6 bg-red-500 rounded-full origin-bottom ${
                   entryDirection === 'East' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-90' :
-                    entryDirection === 'South' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-180' :
-                      'bottom-1/2 left-1/2 -translate-x-1/2 -rotate-90'
+                  'bottom-1/2 left-1/2 -translate-x-1/2 -rotate-90' // West
                   }`} />
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{entryDirection} Entry</p>
@@ -359,6 +385,13 @@ const Dashboard = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Download Button */}
+                <div className="w-full flex justify-end mt-2">
+                  <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm transition-colors text-slate-800 dark:text-slate-200">
+                    <Download size={16} /> Download {renderStyle === 'Sketch' ? 'Sketch' : '3D'} JPG
+                  </button>
+                </div>
               </div>
             )}
 
