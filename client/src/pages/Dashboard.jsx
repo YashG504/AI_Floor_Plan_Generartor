@@ -5,6 +5,7 @@ import ThemeContext from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import FloorPlanViewer from '../components/FloorPlanViewer';
+import CADFloorPlanRenderer from '../components/CADFloorPlanRenderer';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -31,6 +32,8 @@ const Dashboard = () => {
   const [generationInProgress, setGenerationInProgress] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [generatedLayout, setGeneratedLayout] = useState(null);
+  const [cadLayout, setCadLayout] = useState(null);       // ← CAD mode data
+  const [renderMode, setRenderMode] = useState(null);     // 'cad' | '3d'
   const [errorMessage, setErrorMessage] = useState(null);
 
   const [features, setFeatures] = useState({
@@ -62,6 +65,8 @@ const Dashboard = () => {
     setGenerationInProgress(true);
     setErrorMessage(null);
     setGeneratedImage(null);
+    setCadLayout(null);
+    setRenderMode(null);
 
     const selectedFeatures = Object.entries(features)
       .filter(([_, selected]) => selected)
@@ -73,7 +78,14 @@ const Dashboard = () => {
         model: selectedModel,
         details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection, vastuCompliant }
       });
-      setGeneratedImage(response.data.image);
+      setRenderMode(response.data.renderMode);
+      if (response.data.renderMode === 'cad') {
+        setCadLayout(response.data.cadLayout);
+        setGeneratedImage(null);
+      } else {
+        setGeneratedImage(response.data.image);
+        setCadLayout(null);
+      }
       setGeneratedLayout(response.data.layout_breakdown);
     } catch (error) {
       setErrorMessage(error.response?.data?.error || 'Failed to generate floor plan. Please try again.');
@@ -83,13 +95,21 @@ const Dashboard = () => {
   };
 
   const handleDownload = () => {
-    if (!generatedImage) return;
-    const link = document.createElement('a');
-    link.href = generatedImage;
-    link.download = renderStyle === 'Sketch' ? 'floor-plan-sketch.jpg' : 'floor-plan-3d.jpg';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (renderMode === 'cad') {
+      // CADFloorPlanRenderer has its own download button; this is a fallback
+      const canvas = document.querySelector('canvas');
+      if (!canvas) return;
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `floor-plan-${renderStyle.toLowerCase()}.png`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } else {
+      if (!generatedImage) return;
+      const link = document.createElement('a');
+      link.href = generatedImage;
+      link.download = 'floor-plan-3d.jpg';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
   };
 
   const handleChatSubmit = (e) => {
@@ -288,7 +308,7 @@ const Dashboard = () => {
             </button>
 
             <div className="text-right mt-4 text-xs text-slate-500 flex items-center justify-end gap-1">
-              <span className="text-yellow-500">✨</span> {generatedImage ? 'Floor plan generated successfully!' : 'Ready to generate'}
+              <span className="text-yellow-500">✨</span> {(generatedImage || cadLayout) ? 'Floor plan generated successfully!' : 'Ready to generate'}
             </div>
           </div>
         </div>
@@ -356,8 +376,40 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Generated Image */}
-            {generatedImage && !generationInProgress && !errorMessage && (
+            {/* ── CAD Floor Plan (Sketch / Blueprint mode) ── */}
+            {renderMode === 'cad' && cadLayout && !generationInProgress && !errorMessage && (
+              <div className="flex flex-col items-center justify-center w-full p-4 gap-4">
+                <CADFloorPlanRenderer
+                  cadLayout={cadLayout}
+                  length={length}
+                  breadth={breadth}
+                  entryDirection={entryDirection}
+                  renderStyle={renderStyle}
+                />
+                {/* Room Breakdown */}
+                {generatedLayout && (
+                  <div className="w-full bg-slate-100 dark:bg-slate-800/80 p-4 rounded-lg border border-slate-200 dark:border-slate-700 max-h-[400px] overflow-y-auto">
+                    <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                      <Layers size={14} /> Room Breakdown
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {generatedLayout.map((room, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-700/50 p-2 rounded text-xs flex justify-between items-center border border-slate-200 dark:border-slate-600">
+                          <span className="text-slate-800 dark:text-slate-200">{room.name}</span>
+                          <div className="text-right">
+                            <div className="text-blue-600 dark:text-blue-300 font-mono">{room.dimensions}</div>
+                            <div className="text-slate-500 dark:text-slate-500 text-[10px]">{room.area} sqft</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── 3D AI Generated Image ── */}
+            {renderMode === '3d' && generatedImage && !generationInProgress && !errorMessage && (
               <div className="flex flex-col items-center justify-center w-full p-4 gap-4">
                 <FloorPlanViewer
                   imageSrc={generatedImage}
@@ -396,7 +448,7 @@ const Dashboard = () => {
             )}
 
             {/* Initial State */}
-            {!generationInProgress && !generatedImage && !errorMessage && (
+            {!generationInProgress && !generatedImage && !cadLayout && !errorMessage && (
               <div className="text-center p-10">
                 <div className="mb-4 text-slate-400 dark:text-slate-600 inline-block p-4 rounded-full bg-slate-100 dark:bg-slate-800">
                   <Home size={48} />
