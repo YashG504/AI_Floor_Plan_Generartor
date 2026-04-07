@@ -78,11 +78,14 @@ const Dashboard = () => {
         model: selectedModel,
         details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection, vastuCompliant }
       });
-      setRenderMode(response.data.renderMode);
       if (response.data.renderMode === 'cad') {
+        // Add a short delay for sketch output so the generation feels substantial
+        await new Promise(resolve => setTimeout(resolve, 4500));
+        setRenderMode('cad');
         setCadLayout(response.data.cadLayout);
         setGeneratedImage(null);
       } else {
+        setRenderMode(response.data.renderMode);
         setGeneratedImage(response.data.image);
         setCadLayout(null);
       }
