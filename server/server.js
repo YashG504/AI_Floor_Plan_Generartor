@@ -395,7 +395,11 @@ app.post('/api/generate-floorplan', async (req, res) => {
     }
 
     const cleanDir    = (entryDirection || 'East').trim();
-    const entryContext = `Main entry door facing ${cleanDir}. ${vastuPrompt}`.trim();
+    const entryContext = [
+      `Main entry door facing ${cleanDir}.`,
+      `CRITICAL: Place the main entry gate/door on the ${cleanDir} side of the house boundary.`,
+      vastuPrompt
+    ].filter(Boolean).join(' ');
 
     const finalPrompt = build3DPrompt({
       roomCountConstraint, indoorRoomStr, outdoorAreaStr,
@@ -450,7 +454,7 @@ app.post('/api/generate-floorplan', async (req, res) => {
       layout_breakdown,
       length:          parseInt(length) || 40,
       breadth:         parseInt(breadth) || 45,
-      entryDirection:  entryDirection || 'North',
+      entryDirection:  cleanDir,
       prompt_used:     finalPrompt.substring(0, 200) + '...',
       validation:      validationPassed ? 'passed' : 'retried',
       status:          'success'

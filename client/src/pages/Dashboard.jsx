@@ -7,6 +7,8 @@ import api from '../api';
 import FloorPlanViewer from '../components/FloorPlanViewer';
 import CADFloorPlanRenderer from '../components/CADFloorPlanRenderer';
 
+const MAX_DIMENSION_FT = 500;
+
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const { theme, toggleTheme } = useContext(ThemeContext);
@@ -57,8 +59,18 @@ const Dashboard = () => {
   };
 
   const handleGenerateFloorPlan = async () => {
-    if (length <= 0 || breadth <= 0 || bedrooms <= 0 || bathrooms < 0) {
-      setErrorMessage("Please enter valid positive dimensions and room counts.");
+    if (!Number.isFinite(length) || !Number.isFinite(breadth) || length <= 0 || breadth <= 0) {
+      setErrorMessage('Invalid input: Length and breadth must be greater than 0 ft.');
+      return;
+    }
+
+    if (length > MAX_DIMENSION_FT || breadth > MAX_DIMENSION_FT) {
+      setErrorMessage(`Invalid input: Length and breadth must be ${MAX_DIMENSION_FT} ft or less.`);
+      return;
+    }
+
+    if (bedrooms <= 0 || bathrooms < 0) {
+      setErrorMessage('Invalid input: Please enter valid room counts.');
       return;
     }
     
@@ -145,9 +157,9 @@ const Dashboard = () => {
       response = input.includes('no') ? 'Vastu mode disabled.' : 'Vastu mode enabled.';
     }
     
-    // Direction mapping for East & West only
+    // Direction mapping for supported entry directions
     const dirMap = {
-      'east': 'East', 'west': 'West'
+      'east': 'East', 'west': 'West', 'north': 'North'
     };
 
     for (const [key, val] of Object.entries(dirMap)) {
@@ -217,11 +229,11 @@ const Dashboard = () => {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Length (ft)</label>
-                  <input type="number" value={length} onChange={(e) => setLength(Number(e.target.value))} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
+                  <input type="number" min="1" max={MAX_DIMENSION_FT} value={length} onChange={(e) => setLength(Number(e.target.value))} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">Breadth (ft)</label>
-                  <input type="number" value={breadth} onChange={(e) => setBreadth(Number(e.target.value))} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
+                  <input type="number" min="1" max={MAX_DIMENSION_FT} value={breadth} onChange={(e) => setBreadth(Number(e.target.value))} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" />
                 </div>
               </div>
               <div className="flex justify-between text-xs mb-4 px-1">
@@ -238,6 +250,7 @@ const Dashboard = () => {
                 <select value={entryDirection} onChange={(e) => setEntryDirection(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
                   <option>East</option>
                   <option>West</option>
+                  <option>North</option>
                 </select>
               </div>
               <label className="flex items-center space-x-2 cursor-pointer">
@@ -324,13 +337,14 @@ const Dashboard = () => {
             <div className="absolute top-5 right-5 z-10 flex flex-col items-center gap-2">
               {/* Compass Rose */}
               <div className="relative w-20 h-20 bg-white dark:bg-slate-700 rounded-full border-2 border-blue-300 dark:border-blue-500 shadow-lg flex items-center justify-center">
-                {/* East & West Directions */}
-                {['E', 'W'].map((dir) => {
+                {/* East, West & North Directions */}
+                {['N', 'E', 'W'].map((dir) => {
                   const angles = { 
+                    N: 'top-1 left-1/2 -translate-x-1/2',
                     E: 'right-1 top-1/2 -translate-y-1/2', 
                     W: 'left-1 top-1/2 -translate-y-1/2',
                   };
-                  const dirMap = { E: 'East', W: 'West' };
+                  const dirMap = { N: 'North', E: 'East', W: 'West' };
                   const isSelected = entryDirection === dirMap[dir];
                   return (
                     <span key={dir} className={`absolute text-[10px] sm:text-[11px] font-bold ${angles[dir]} ${isSelected ? 'text-blue-500 dark:text-blue-400 scale-125' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -343,7 +357,8 @@ const Dashboard = () => {
                 {/* Arrow pointing to entry direction */}
                 <div className={`absolute w-0.5 h-6 bg-red-500 rounded-full origin-bottom ${
                   entryDirection === 'East' ? 'bottom-1/2 left-1/2 -translate-x-1/2 rotate-90' :
-                  'bottom-1/2 left-1/2 -translate-x-1/2 -rotate-90' // West
+                  entryDirection === 'West' ? 'bottom-1/2 left-1/2 -translate-x-1/2 -rotate-90' :
+                  'bottom-1/2 left-1/2 -translate-x-1/2' // North
                   }`} />
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{entryDirection} Entry</p>

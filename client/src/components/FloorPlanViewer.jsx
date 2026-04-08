@@ -26,11 +26,13 @@ const FloorPlanViewer = ({ imageSrc, length, breadth, entryDirection }) => {
   const entryArrow = {
     'East': { side: 'right', Icon: ArrowLeft, label: 'East Entry' },
     'West': { side: 'left', Icon: ArrowRight, label: 'West Entry' },
+    'North': { side: 'top', Icon: ArrowDown, label: 'North Entry' },
   }[entryDirection] || { side: 'right', Icon: ArrowLeft, label: 'East Entry' };
 
   const entryPositionClasses = {
     'left': 'left-0 top-1/2 -translate-y-1/2 -translate-x-full flex-row-reverse',
     'right': 'right-0 top-1/2 -translate-y-1/2 translate-x-full flex-row',
+    'top': 'top-0 left-1/2 -translate-x-1/2 -translate-y-full flex-row',
   };
 
   return (
