@@ -39,8 +39,6 @@ const Dashboard = () => {
   const [errorMessage, setErrorMessage] = useState(null);
 
   const [features, setFeatures] = useState({
-    kitchen: true,
-    livingRoom: true,
     diningRoom: true,
     office: false,
     garage: false,
@@ -71,6 +69,16 @@ const Dashboard = () => {
 
     if (bedrooms <= 0 || bathrooms < 0) {
       setErrorMessage('Invalid input: Please enter valid room counts.');
+      return;
+    }
+
+    if (bedrooms > 6) {
+      setErrorMessage('Maximum 6 bedrooms supported for 2D layout generation.');
+      return;
+    }
+
+    if (bedrooms > 5 || bathrooms > 5 || sqFeet > 2500) {
+      setErrorMessage('Input exceeds allowed limits. Please update your data.');
       return;
     }
     
@@ -150,7 +158,6 @@ const Dashboard = () => {
     if (input.includes('pool')) setFeatures(f => ({ ...f, pool: !input.includes('remove') }));
     if (input.includes('garden')) setFeatures(f => ({ ...f, garden: !input.includes('remove') }));
     if (input.includes('office')) setFeatures(f => ({ ...f, office: !input.includes('remove') }));
-    if (input.includes('kitchen')) setFeatures(f => ({ ...f, kitchen: !input.includes('remove') }));
     if (input.includes('balcony')) setFeatures(f => ({ ...f, balcony: !input.includes('remove') }));
     if (input.includes('vastu')) {
       setVastuCompliant(!input.includes('remove') && !input.includes('no'));

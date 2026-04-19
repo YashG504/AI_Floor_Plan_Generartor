@@ -61,8 +61,8 @@ function computeCADLayout({
   const isVertical = (dir === 'East' || dir === 'West');
   
   // Base dimensions
-  const layerFront = 0.35;
-  const layerMid   = 0.30;
+  const layerFront = 0.25; // Shrunk proportion for entry spaces (Living Room)
+  const layerMid   = 0.40;
   const layerBack  = 0.35;
 
   let backRect, midRect, frontRect;
@@ -105,20 +105,18 @@ function computeCADLayout({
     }
   }
 
-  // ── Middle Layer (Dining / Kitchen) ─────────────────────────────────────────
-  let midSpace1, midSpace2; 
-  if (isVertical) {
-    midSpace1 = { x: midRect.x, y: midRect.y, w: midRect.w, h: midRect.h * 0.45 };
-    midSpace2 = { x: midRect.x, y: midRect.y + midRect.h * 0.45, w: midRect.w, h: midRect.h * 0.55 };
-  } else {
-    midSpace1 = { x: midRect.x + midRect.w * 0.5, y: midRect.y, w: midRect.w * 0.5, h: midRect.h };
-    midSpace2 = { x: midRect.x, y: midRect.y, w: midRect.w * 0.5, h: midRect.h };
-  }
-
-  // midSpace1 = Top/Right (Dining/Hall)
-  // midSpace2 = Bottom/Left (Kitchen/Hall)
-  addRoom('dining', hasDining ? 'Dining Room' : 'Hall', midSpace1.x, midSpace1.y, midSpace1.w, midSpace1.h, null);
-  addRoom('kitchen', hasKitchen ? 'Kitchen' : 'Hall', midSpace2.x, midSpace2.y, midSpace2.w, midSpace2.h, null);
+  // ── Middle Layer (Kitchen + Dining Integration) ─────────────────────────────
+  // Rule: Dining area must be integrated with the Kitchen (open kitchen + dining concept).
+  const mergeLabel = hasDining ? 'Kitchen & Dining (Open Concept)' : 'Kitchen';
+  addRoom(
+    hasDining ? 'kitchen_dining' : 'kitchen', 
+    mergeLabel, 
+    midRect.x, 
+    midRect.y, 
+    midRect.w, 
+    midRect.h, 
+    null
+  );
 
   // ── Back Layer (Bedrooms) ───────────────────────────────────────────────────
   for (let i = 0; i < numBedrooms; i++) {
@@ -322,12 +320,20 @@ app.post('/api/generate-floorplan', async (req, res) => {
     const numBedrooms  = Math.max(1, parseInt(bedrooms)  || 1);
     const numBathrooms = Math.max(1, parseInt(bathrooms) || 1);
 
+    if (numBedrooms > 5 || numBathrooms > 5 || (rawLength * rawBreadth) > 2500) {
+      if (numBedrooms > 6) {
+        return res.status(400).json({ error: 'Maximum 6 bedrooms supported for 2D layout generation.' });
+      }
+      return res.status(400).json({ error: 'Input exceeds allowed limits. Please update your data.' });
+    }
+
     // ── Feature flags ─────────────────────────────────────────────────────────
     const selectedFeatureKeys = featureList ? featureList.split(',').map(f => f.trim()) : [];
     const has = key => selectedFeatureKeys.includes(key);
 
-    const hasLiving  = has('livingRoom');
-    const hasKitchen = has('kitchen');
+    // Kitchen and Living Room are strictly mandatory
+    const hasLiving  = true;
+    const hasKitchen = true;
     const hasDining  = has('diningRoom');
     const hasOffice  = has('office');
     const hasGarage  = has('garage');

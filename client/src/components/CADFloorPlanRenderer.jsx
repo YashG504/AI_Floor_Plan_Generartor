@@ -410,6 +410,17 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       drawDiningTable(ctx, px, py, sc, x + (w - tw) / 2, y + (h - th) / 2, tw, th, 6);
       drawLabel(ctx, px, py, label, x + w / 2, y + h * 0.9, 8.5, LABEL_ROOM_COLOR, true);
     }
+    if (type === 'kitchen_dining') {
+      const cw2 = Math.min(w * 0.4, 5.2);
+      drawKitchenCounter(ctx, px, py, sc, x + 0.25, y + 0.25, cw2, Math.min(h - 0.5, 1.5));
+      drawLine(ctx, px, py, sc, x + 0.25, y + 1.9, x + 0.25 + cw2, y + 1.9, FURN_COLOR, 0.4, [sc(0.2), sc(0.12)]);
+
+      const tw = Math.min(w * 0.4, 3.5);
+      const th = Math.min(h - 1.5, 2.0);
+      drawDiningTable(ctx, px, py, sc, x + w - tw - 0.5, y + (h - th) / 2, tw, th, 6);
+
+      drawLabel(ctx, px, py, label, x + w / 2, y + h * 0.85, 8.5, LABEL_ROOM_COLOR, true);
+    }
     if (type === 'office') {
       const dw = Math.min(w - 0.6, 2.8);
       drawDesk(ctx, px, py, sc, x + 0.3, y + 0.3, dw, Math.min(h * 0.45, 1.4));
