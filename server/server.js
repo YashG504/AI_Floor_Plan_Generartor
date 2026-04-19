@@ -226,21 +226,24 @@ function computeCADLayout({
 
 function build3DPrompt({
   roomCountConstraint, indoorRoomStr, outdoorAreaStr,
-  hasOutdoorFeatures, excludeStr, entryContext, rawLength, rawBreadth
+  hasOutdoorFeatures, excludeStr, entryContext, archStyle, spatialHint
 }) {
   const noOutdoors = hasOutdoorFeatures ? '' : 'NO outdoor landscaping, NO garden, NO external areas. ';
   const outdoorSection = hasOutdoorFeatures
     ? `OUTDOOR AREAS outside the house boundary walls as separate open-air zones (NOT inside any room): ${outdoorAreaStr}.`
     : '';
 
+  const styleStr = archStyle ? archStyle.toLowerCase() : 'modern';
+
   return [
     `${roomCountConstraint}`,
-    'Photorealistic top-down orthographic 3D architectural floor plan of a modern single-story home.',
+    `Photorealistic top-down orthographic 3D architectural floor plan of a ${styleStr} single-story home.`,
     'Cutaway view from directly above — no roof.',
-    'Distinct solid interior walls separating each room.',
-    'Precisely scaled miniature 3D furniture.',
-    'V-Ray render, soft ambient lighting, clean lines.',
+    'Distinct solid interior walls separating each room cleanly, exactly like a translated CAD diagram.',
+    'Precisely scaled highly-detailed miniature 3D furniture.',
+    'V-Ray render, soft ambient lighting, clean structural lines.',
     entryContext || '',
+    spatialHint || '',
     `INDOOR ROOMS inside the house walls: ${indoorRoomStr}.`,
     outdoorSection,
     noOutdoors,
@@ -476,10 +479,21 @@ app.post('/api/generate-floorplan', async (req, res) => {
       vastuPrompt
     ].filter(Boolean).join(' ');
 
+    const spatialHints = [];
+    if (cleanDir === 'East') {
+       spatialHints.push('Layout mapping: Main entry and Living Room on the East side. Kitchen and Dining in the center. Bedrooms clustered on the West side.');
+    } else if (cleanDir === 'West') {
+       spatialHints.push('Layout mapping: Main entry and Living Room on the West side. Kitchen and Dining in the center. Bedrooms clustered on the East side.');
+    } else if (cleanDir === 'North') {
+       spatialHints.push('Layout mapping: Main entry and Living Room on the North side. Kitchen and Dining in the center. Bedrooms clustered on the South side.');
+    } else { // South
+       spatialHints.push('Layout mapping: Main entry and Living Room on the South side. Kitchen and Dining in the center. Bedrooms clustered on the North side.');
+    }
+
     const finalPrompt = build3DPrompt({
       roomCountConstraint, indoorRoomStr, outdoorAreaStr,
-      hasOutdoorFeatures, excludeStr, entryContext,
-      rawLength, rawBreadth
+      hasOutdoorFeatures, excludeStr, entryContext, 
+      archStyle, spatialHint: spatialHints[0]
     });
 
     console.log('\n=== 3D AI GENERATION MODE ===');
