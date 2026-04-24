@@ -55,7 +55,8 @@ function computeCADLayout({
   const id = () => ++idCounter;
 
   const addRoom = (label, type, x, y, w, h, doorDesc, doorOff, bath) => {
-    rooms.push({ id: id(), label, type, x, y, w, h, doorDesc, doorOff, bath });
+    const openTypes = type === 'dining' || type === 'living';
+    rooms.push({ id: id(), label, type, x, y, w, h, doorDesc, doorOff, bath, noWall: openTypes });
   };
 
   const leftW = L * 0.35;

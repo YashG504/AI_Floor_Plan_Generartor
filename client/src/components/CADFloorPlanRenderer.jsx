@@ -15,9 +15,9 @@ const OUTDOOR_BG = 'transparent';
 const BATH_BG = 'transparent';
 const FURN_FILL = BG_COLOR; // Solid fill for furniture to hide lines underneath
 
-const WALL_EXT_LW = 5.0; // Thicker outer wall
-const WALL_INT_LW = 2.0; // Thinner internal wall
-const DOOR_RADIUS = 3.0; // feet (width of gap segment)
+const WALL_EXT_LW = 12.0; // Very thick outer wall matching reference
+const WALL_INT_LW = 3.5; // Thicker internal wall
+const DOOR_RADIUS = 2.8; // feet (width of gap segment)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function drawRect(ctx, px, py, sc, x, y, w, h, fill, stroke, lw) {
@@ -51,14 +51,12 @@ function drawLabel(ctx, px, py, text, x, y, size = 9, color = LABEL_COLOR, bold 
 
 function doorArc(ctx, px, py, sc, cx, cy, r, startAngle, endAngle, leafAngle) {
   ctx.save();
-  // arc (dashed thin line)
+  // arc — SOLID line matching reference style
   ctx.strokeStyle = INK_COLOR;
-  ctx.lineWidth = 1.0;
-  ctx.setLineDash([sc(0.2), sc(0.2)]);
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(px(cx), py(cy), sc(r), startAngle, endAngle);
   ctx.stroke();
-  ctx.setLineDash([]);
 
   // door leaf (solid thick line)
   ctx.lineWidth = 2.5;
@@ -294,95 +292,95 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
 
     if (bath) {
       const { x: bx, y: by, w: bw, h: bh } = bath;
-      const fixtureScale = Math.min(bw, bh) / 4;
-      const ts = Math.max(0.8, fixtureScale);
-      drawToilet(ctx, px, py, sc, bx + 0.18, by + 0.18, ts * 0.9, ts * 1.35);
-      drawSink(ctx, px, py, sc, bx + ts + 0.3, by + 0.2, ts * 0.82);
+      const fixtureScale = Math.min(bw, bh) / 3.5;
+      const ts = Math.max(1.0, fixtureScale);
+      drawToilet(ctx, px, py, sc, bx + 0.3, by + 0.3, ts * 1.1, ts * 1.6);
+      drawSink(ctx, px, py, sc, bx + ts * 1.3 + 0.4, by + 0.3, ts * 1.0);
       if (bw > 2.5) {
-        drawBathtub(ctx, px, py, sc, bx + bw - 1.9, by + bh - 1.2, 1.6, 0.95);
+        drawBathtub(ctx, px, py, sc, bx + bw - 2.5, by + bh - 1.6, 2.2, 1.3);
       }
     }
 
     if (type === 'bathroom') {
       const isRightWing = x > L / 2;
-      const fixtureScale = Math.min(w, h) / 4;
-      const ts = Math.max(0.8, fixtureScale);
-      const fixX = isRightWing ? x + w - ts * 0.9 - 0.5 : x + 0.5;
+      const fixtureScale = Math.min(w, h) / 3.5;
+      const ts = Math.max(1.0, fixtureScale);
+      const fixX = isRightWing ? x + w - ts * 1.1 - 0.6 : x + 0.6;
 
-      drawToilet(ctx, px, py, sc, fixX, y + 0.5, ts * 0.9, ts * 1.35);
-      drawSink(ctx, px, py, sc, fixX, y + ts * 1.6 + 0.5, ts * 0.82);
+      drawToilet(ctx, px, py, sc, fixX, y + 0.6, ts * 1.1, ts * 1.6);
+      drawSink(ctx, px, py, sc, fixX, y + ts * 1.9 + 0.6, ts * 1.0);
 
-      if (w > 4 && h > 4) {
-        const tubW = 1.6;
-        const tubH = 0.95;
-        const tubX = isRightWing ? x + w - tubW - 0.5 : x + 0.5;
-        drawBathtub(ctx, px, py, sc, tubX, y + h - tubH - 0.5, tubW, tubH);
+      if (w > 3 && h > 3) {
+        const tubW = Math.min(w * 0.45, 3.0);
+        const tubH = Math.min(h * 0.25, 1.6);
+        const tubX = isRightWing ? x + w - tubW - 0.6 : x + 0.6;
+        drawBathtub(ctx, px, py, sc, tubX, y + h - tubH - 0.6, tubW, tubH);
       }
     }
 
     if (type === 'bedroom') {
       const isRightWing = x > L / 2;
       const bw2 = bath ? w - bath.w : w;
-      const bedW = Math.min(w * 0.6, 6.5);
-      const bedH = Math.min(h * 0.65, 7.5);
+      const bedW = Math.min(w * 0.78, 14.0);
+      const bedH = Math.min(h * 0.6, 14.0);
 
-      const bedX = x + 0.6;
-      const bedY = isRightWing ? y + h - bedH - 0.6 : y + 0.6;
+      const bedX = x + 0.8;
+      const bedY = isRightWing ? y + h - bedH - 0.8 : y + 0.8;
       drawBed(ctx, px, py, sc, bedX, bedY, bedW, bedH);
 
-      const wardW = Math.min(w * 0.4, 5.0);
-      const wardY = isRightWing ? y + 0.6 : y + h - 2.0;
-      drawWardrobe(ctx, px, py, sc, bedX, wardY, wardW, 1.8);
+      const wardW = Math.min(w * 0.6, 10.0);
+      const wardY = isRightWing ? y + 0.8 : y + h - 3.0;
+      drawWardrobe(ctx, px, py, sc, bedX, wardY, wardW, 2.5);
     }
     if (type === 'living') {
-      const sofaW = Math.min(w * 0.65, 12.0);
-      const sofaH = Math.min(h * 0.25, 3.8);
+      const sofaW = Math.min(w * 0.82, 18.0);
+      const sofaH = Math.min(h * 0.28, 5.0);
       const sofaX = x + (w - sofaW) / 2;
-      const sofaY = y + (h - sofaH) / 2 - 2.0;
+      const sofaY = y + h * 0.15;
       drawSofa(ctx, px, py, sc, sofaX, sofaY, sofaW, sofaH);
 
-      const ctW = Math.min(sofaW * 0.6, 5.0);
+      const ctW = Math.min(sofaW * 0.55, 7.0);
+      const ctH = Math.min(h * 0.12, 3.5);
       const ctX = sofaX + (sofaW - ctW) / 2;
-      drawCoffeeTable(ctx, px, py, sc, ctX, sofaY + sofaH + 1.5, ctW, 2.5);
+      drawCoffeeTable(ctx, px, py, sc, ctX, sofaY + sofaH + 2.0, ctW, ctH);
 
-      const tvW = Math.min(sofaW * 0.7, 7.0);
+      const tvW = Math.min(sofaW * 0.7, 10.0);
       const tvX = sofaX + (sofaW - tvW) / 2;
-      drawTVUnit(ctx, px, py, sc, tvX, y + h - 1.8, tvW, 1.2);
+      drawTVUnit(ctx, px, py, sc, tvX, y + h - 2.2, tvW, 1.6);
     }
     if (type === 'kitchen') {
-      const cw2 = Math.min(w * 0.7, 13.0);
+      const cw2 = Math.min(w * 0.85, 16.0);
       const cxOffset = x + (w - cw2) / 2;
-      drawKitchenCounter(ctx, px, py, sc, cxOffset, y + 0.8, cw2, 2.2);
-      const islandW = cw2 * 0.6;
+      drawKitchenCounter(ctx, px, py, sc, cxOffset, y + 0.8, cw2, 3.0);
+      const islandW = cw2 * 0.65;
       const islandX = cxOffset + (cw2 - islandW) / 2;
-      const islandY = y + 4.5;
-      drawRect(ctx, px, py, sc, islandX, islandY, islandW, 2.0, FURN_FILL, FURN_COLOR, 1.8);
-      // Bar stools
-      const stools = 3;
+      const islandY = y + 5.5;
+      drawRect(ctx, px, py, sc, islandX, islandY, islandW, 2.5, FURN_FILL, FURN_COLOR, 1.8);
+      const stools = Math.max(3, Math.round(islandW / 2.5));
       const stoolGap = islandW / stools;
       for (let i = 0; i < stools; i++) {
         ctx.beginPath();
-        ctx.arc(px(islandX + stoolGap * i + stoolGap / 2), py(islandY + 2.6), sc(0.35), 0, Math.PI * 2);
+        ctx.arc(px(islandX + stoolGap * i + stoolGap / 2), py(islandY + 3.2), sc(0.45), 0, Math.PI * 2);
         ctx.fillStyle = FURN_FILL; ctx.fill();
         ctx.strokeStyle = FURN_COLOR; ctx.lineWidth = 1.0; ctx.stroke();
       }
     }
     if (type === 'dining') {
-      const tw = Math.min(w * 0.7, 6.5);
-      const th = Math.min(h * 0.5, 3.5);
-      drawDiningTable(ctx, px, py, sc, x + (w - tw) / 2, y + (h - th) / 2, tw, th, 6);
+      const tw = Math.min(w * 0.75, 10.0);
+      const th = Math.min(h * 0.55, 5.5);
+      drawDiningTable(ctx, px, py, sc, x + (w - tw) / 2, y + (h - th) / 2, tw, th, 8);
     }
     if (type === 'kitchen_dining') {
       const cw2 = w - 0.5;
-      drawKitchenCounter(ctx, px, py, sc, x + 0.25, y + 0.8, cw2, 2.2);
+      drawKitchenCounter(ctx, px, py, sc, x + 0.25, y + 0.8, cw2, 3.0);
 
-      const tw = Math.min(w * 0.6, 5.5);
-      const th = Math.min(h * 0.4, 3.0);
-      drawDiningTable(ctx, px, py, sc, x + (w - tw) / 2, y + h - th - 1.0, tw, th, 6);
+      const tw = Math.min(w * 0.7, 8.0);
+      const th = Math.min(h * 0.45, 4.5);
+      drawDiningTable(ctx, px, py, sc, x + (w - tw) / 2, y + h - th - 1.2, tw, th, 6);
     }
     if (type === 'office') {
-      const dw = Math.min(w - 0.6, 4.5);
-      drawDesk(ctx, px, py, sc, x + 0.5, y + 0.5, dw, Math.min(h * 0.45, 2.2));
+      const dw = Math.min(w * 0.7, 7.0);
+      drawDesk(ctx, px, py, sc, x + 0.5, y + 0.5, dw, Math.min(h * 0.5, 3.5));
     }
   });
 
@@ -456,8 +454,27 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
     }
   });
 
-  // ── Phase 5.5: Main Entry Arrow ─────────────────────────────────────────────
-  drawEntryArrow(ctx, px, py, sc, L, B, entryDirection);
+  // ── Phase 5.5: Main Entry Arrow (subtle, matching reference) ────────────────
+  // Draw a simple thick entry line instead of full arrow for cleaner look
+  const entryMap = {
+    East:  { x1: L + 0.5, y1: B / 2 - 1.5, x2: L + 0.5, y2: B / 2 + 1.5, ax: L + 1.2, ay: B / 2, adx: -1, ady: 0 },
+    West:  { x1: -0.5, y1: B / 2 - 1.5, x2: -0.5, y2: B / 2 + 1.5, ax: -1.2, ay: B / 2, adx: 1, ady: 0 },
+    North: { x1: L / 2 - 1.5, y1: -0.5, x2: L / 2 + 1.5, y2: -0.5, ax: L / 2, ay: -1.2, adx: 0, ady: 1 },
+    South: { x1: L / 2 - 1.5, y1: B + 0.5, x2: L / 2 + 1.5, y2: B + 0.5, ax: L / 2, ay: B + 1.2, adx: 0, ady: -1 }
+  };
+  const em = entryMap[entryDirection] || entryMap.East;
+  ctx.save();
+  ctx.strokeStyle = INK_COLOR; ctx.fillStyle = INK_COLOR;
+  ctx.lineWidth = 3.0;
+  ctx.beginPath(); ctx.moveTo(px(em.ax), py(em.ay));
+  ctx.lineTo(px(em.ax + em.adx * 2.5), py(em.ay + em.ady * 2.5)); ctx.stroke();
+  const eax = px(em.ax + em.adx * 2.5), eay = py(em.ay + em.ady * 2.5);
+  const eangle = Math.atan2(em.ady, em.adx);
+  ctx.beginPath(); ctx.moveTo(eax, eay);
+  ctx.lineTo(eax - sc(0.7) * Math.cos(eangle - 0.5), eay - sc(0.7) * Math.sin(eangle - 0.5));
+  ctx.lineTo(eax - sc(0.7) * Math.cos(eangle + 0.5), eay - sc(0.7) * Math.sin(eangle + 0.5));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
 
   // ── Phase 6: Room Labels ────────────────────────────────────────────────────
   // Labels are removed by default to maintain the pristine architectural sketch aesthetic.
@@ -479,9 +496,9 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
 const CADFloorPlanRenderer = ({ cadLayout, length, breadth, entryDirection, renderStyle }) => {
   const canvasRef = useRef(null);
 
-  // Canvas resolution: 900×820 logical pixels
-  const CANVAS_W = 900;
-  const CANVAS_H = 820;
+  // Canvas resolution: higher for crisp professional output
+  const CANVAS_W = 1200;
+  const CANVAS_H = 1000;
 
   useEffect(() => {
     if (!cadLayout || !canvasRef.current) return;
