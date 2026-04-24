@@ -53,166 +53,143 @@ function computeCADLayout({
   const L = length, B = breadth, rooms = [];
   let idCounter = 0;
   const id = () => ++idCounter;
-  const dir = (entryDirection || 'East').trim();
 
-  // ── Adaptive "Private Wing + Open Center" Layout ──────────────────────────
-  //  Left column (33%): Bedrooms stacked + common bath at bottom
-  //  Right area  (67%): Open living + kitchen + dining (no interior walls)
-  //
-  //  ┌──────────┬──────────────────────────────┐
-  //  │  BR 1    │                              │
-  //  │ (+bath)  │    Kitchen (top area)        │
-  //  ├──────────┤                              │
-  //  │  BR 2    │    Living Room (center)      │ ← Entry
-  //  │          │                              │
-  //  ├──────────┤    Dining (bottom area)      │
-  //  │  BR 3    │                              │
-  //  ├──────────┤                              │
-  //  │Com. Bath │                              │
-  //  └──────────┴──────────────────────────────┘
+  const addRoom = (label, type, x, y, w, h, doorDesc, doorOff, bath) => {
+    rooms.push({ id: id(), label, type, x, y, w, h, doorDesc, doorOff, bath });
+  };
 
-  const leftW = L * 0.55;
-  const rightW = L - leftW;
-  const bathH = B * 0.10;
-  const numLeftBR = Math.min(numBedrooms, 3);
-  const numBotBR = Math.max(0, numBedrooms - 3);
-  const brZoneH = B - bathH;
-  const brH = brZoneH / Math.max(numLeftBR, 1);
-  const hasEnSuite = numBathrooms >= 2;
+  const leftW = L * 0.35;
+  const rightW = L * 0.35;
+  const centerW = L - leftW - rightW;
 
-  // ── Left Column: Bedrooms ─────────────────────────────────────────────────
-  for (let i = 0; i < numLeftBR; i++) {
-    let bath = null;
-    if (i === 0 && hasEnSuite) {
-      bath = {
-        x: leftW * 0.65, y: i * brH + brH * 0.65,
-        w: leftW * 0.30, h: brH * 0.30, label: 'Bath'
-      };
+  // ── PRESET BUILDERS ────────────────────────────────────────────────────────
+  
+  const build1BedroomPreset = () => {
+    const lW = L * 0.45, rW = L - lW;
+    // Private Left
+    addRoom('Bedroom 1', 'bedroom', 0, 0, lW, B * 0.55, 'right', 0.8,
+      numBathrooms > 1 ? { x: lW - 6, y: B * 0.55 - 6, w: 6, h: 6, label: 'Bath', door: { wall: 'left', pos: 0.5 } } : null
+    );
+    if (numBathrooms > 0) addRoom('Bathroom', 'bathroom', 0, B * 0.55, lW, B * 0.45, 'right', 0.5);
+    // Public/Service Right
+    let curY = 0;
+    if (hasKitchen) { addRoom('Kitchen', 'kitchen', lW, curY, rW, B * 0.35, 'left', 0.5); curY += B * 0.35; }
+    if (hasDining) { addRoom('Dining', 'dining', lW, curY, rW, B * 0.25, 'left', 0.5); curY += B * 0.25; }
+    if (hasOffice) { addRoom('Office', 'office', lW, curY, rW, B * 0.15, 'left', 0.5); curY += B * 0.15; }
+    addRoom('Living Room', 'living', lW, curY, rW, B - curY, 'bottom', 0.5);
+  };
+
+  const build2BedroomPreset = () => {
+    // 3-column Layout
+    addRoom('Bedroom 1', 'bedroom', 0, 0, leftW, B * 0.5, 'right', 0.8,
+      numBathrooms > 1 ? { x: leftW - 6, y: B * 0.5 - 6, w: 6, h: 6, label: 'Bath', door: { wall: 'left', pos: 0.5 } } : null
+    );
+    addRoom('Bedroom 2', 'bedroom', 0, B * 0.5, leftW, B * 0.5, 'right', 0.2);
+    
+    addRoom('Living Room', 'living', leftW, 0, centerW, B, 'bottom', 0.5);
+    
+    let curY = 0;
+    if (hasKitchen) { addRoom('Kitchen', 'kitchen', leftW + centerW, curY, rightW, B * 0.4, 'left', 0.5); curY += B * 0.4; }
+    if (hasDining) { addRoom('Dining', 'dining', leftW + centerW, curY, rightW, B * 0.3, 'left', 0.5); curY += B * 0.3; }
+    if (hasOffice) { addRoom('Office', 'office', leftW + centerW, curY, rightW, B * 0.15, 'left', 0.5); curY += B * 0.15; }
+    if (numBathrooms > 0) addRoom('Bathroom', 'bathroom', leftW + centerW, curY, rightW, B - curY, 'left', 0.5);
+  };
+
+  const build3BedroomPreset = () => {
+    // Left Wing (Private)
+    addRoom('Bedroom 1', 'bedroom', 0, 0, leftW, B * 0.45, 'right', 0.8,
+      numBathrooms > 1 ? { x: leftW - 6, y: B * 0.45 - 6, w: 6, h: 6, label: 'Bath', door: { wall: 'left', pos: 0.5 } } : null
+    );
+    if (hasOffice) {
+      addRoom('Office', 'office', 0, B * 0.45, leftW, B * 0.15, 'right', 0.5);
+      addRoom('Bedroom 3', 'bedroom', 0, B * 0.6, leftW, B * 0.4, 'right', 0.2);
+    } else {
+      addRoom('Bedroom 3', 'bedroom', 0, B * 0.45, leftW, B * 0.55, 'right', 0.2);
     }
-    rooms.push({
-      id: id(), label: `Bedroom ${i + 1}`, type: 'bedroom',
-      x: 0, y: i * brH, w: leftW, h: brH,
-      doorDesc: 'right', doorOff: 0.3 + i * 0.15, bath
-    });
-  }
 
-  // ── Common Bathroom: bottom-left ──────────────────────────────────────────
-  if (numBathrooms >= 1) {
-    rooms.push({
-      id: id(), label: 'Bathroom', type: 'bathroom',
-      x: 0, y: brZoneH, w: leftW, h: bathH,
-      doorDesc: 'right', doorOff: 0.5
-    });
-  }
+    // Right Wing (Public/Service)
+    addRoom('Bedroom 2', 'bedroom', leftW + centerW, 0, rightW, B * 0.35, 'left', 0.8);
+    let curY = B * 0.35;
+    if (hasKitchen) { addRoom('Kitchen', 'kitchen', leftW + centerW, curY, rightW, B * 0.3, 'left', 0.5); curY += B * 0.3; }
+    if (hasDining) { addRoom('Dining', 'dining', leftW + centerW, curY, rightW, B * 0.15, 'left', 0.5); curY += B * 0.15; }
+    if (numBathrooms > 0) addRoom('Bathroom', 'bathroom', leftW + centerW, curY, rightW, B - curY, 'left', 0.5);
 
-  // ── Overflow Bedrooms (4-5): bottom-right ─────────────────────────────────
-  if (numBotBR > 0) {
-    const obW = rightW / numBotBR;
-    for (let i = 0; i < numBotBR; i++) {
-      rooms.push({
-        id: id(), label: `Bedroom ${numLeftBR + i + 1}`, type: 'bedroom',
-        x: leftW + i * obW, y: brZoneH, w: obW, h: bathH,
-        doorDesc: 'top', doorOff: 0.5
-      });
-    }
-  }
+    // Center Wing (Living)
+    addRoom('Living Room', 'living', leftW, 0, centerW, B, 'bottom', 0.5);
+  };
 
-  // ── Right Area: Open-concept Kitchen -> Dining -> Living ───────────────────
-  const openH = numBotBR > 0 ? brZoneH : B;
-  let currentY = 0;
+  const build4BedroomPreset = () => {
+    addRoom('Bedroom 1', 'bedroom', 0, 0, leftW, B * 0.35, 'right', 0.8,
+      numBathrooms > 1 ? { x: leftW - 6, y: B * 0.35 - 6, w: 6, h: 6, label: 'Bath', door: { wall: 'left', pos: 0.5 } } : null
+    );
+    addRoom('Bedroom 4', 'bedroom', 0, B * 0.35, leftW, B * 0.3, 'right', 0.5);
+    addRoom('Bedroom 3', 'bedroom', 0, B * 0.65, leftW, B * 0.35, 'right', 0.2);
 
-  if (hasKitchen) {
-    const kH = openH * 0.22;
-    rooms.push({
-      id: id(), label: 'Kitchen', type: 'kitchen',
-      x: leftW, y: currentY, w: rightW, h: kH,
-      noWall: true
-    });
-    currentY += kH;
-  }
+    addRoom('Bedroom 2', 'bedroom', leftW + centerW, 0, rightW, B * 0.35, 'left', 0.8);
+    let curY = B * 0.35;
+    if (hasKitchen) { addRoom('Kitchen', 'kitchen', leftW + centerW, curY, rightW, B * 0.35, 'left', 0.5); curY += B * 0.35; }
+    if (hasDining) { addRoom('Dining', 'dining', leftW + centerW, curY, rightW, B * 0.15, 'left', 0.5); curY += B * 0.15; }
+    if (numBathrooms > 0) addRoom('Bathroom', 'bathroom', leftW + centerW, curY, rightW, B - curY, 'left', 0.5);
 
-  if (hasDining) {
-    const dH = openH * 0.22;
-    rooms.push({
-      id: id(), label: 'Dining', type: 'dining',
-      x: leftW, y: currentY, w: rightW, h: dH,
-      noWall: true
-    });
-    currentY += dH;
-  }
+    addRoom('Living Room', 'living', leftW, 0, centerW, B, 'bottom', 0.5);
+  };
 
-  if (hasOffice) {
-    const oH = bathH;
-    rooms.push({
-      id: id(), label: 'Office', type: 'office',
-      x: leftW + 0.5, y: openH - oH - 0.5, w: rightW * 0.28, h: oH,
-      noWall: true
-    });
-  }
+  const build5BedroomPreset = () => {
+    addRoom('Bedroom 1', 'bedroom', 0, 0, leftW, B * 0.35, 'right', 0.8,
+      numBathrooms > 1 ? { x: leftW - 6, y: B * 0.35 - 6, w: 6, h: 6, label: 'Bath', door: { wall: 'left', pos: 0.5 } } : null
+    );
+    addRoom('Bedroom 4', 'bedroom', 0, B * 0.35, leftW, B * 0.3, 'right', 0.5);
+    addRoom('Bedroom 3', 'bedroom', 0, B * 0.65, leftW, B * 0.35, 'right', 0.2);
 
-  if (hasLiving) {
-    rooms.push({
-      id: id(), label: 'Living Room', type: 'living',
-      x: leftW, y: currentY, w: rightW, h: openH - currentY,
-      noWall: true
-    });
-  }
+    addRoom('Bedroom 2', 'bedroom', leftW + centerW, 0, rightW, B * 0.3, 'left', 0.8);
+    addRoom('Bedroom 5', 'bedroom', leftW + centerW, B * 0.3, rightW, B * 0.25, 'left', 0.5);
+    let curY = B * 0.55;
+    if (hasKitchen) { addRoom('Kitchen', 'kitchen', leftW + centerW, curY, rightW, B * 0.25, 'left', 0.5); curY += B * 0.25; }
+    if (numBathrooms > 0) addRoom('Bathroom', 'bathroom', leftW + centerW, curY, rightW, B - curY, 'left', 0.5);
 
-  // ── Door Calculation ──────────────────────────────────────────────────────
+    addRoom('Living Room', 'living', leftW, 0, centerW, B, 'bottom', 0.5);
+  };
+
+  // ── ROUTE PRESET ────────────────────────────────────────────────────────────
+  if (numBedrooms <= 1) build1BedroomPreset();
+  else if (numBedrooms === 2) build2BedroomPreset();
+  else if (numBedrooms === 3) build3BedroomPreset();
+  else if (numBedrooms === 4) build4BedroomPreset();
+  else build5BedroomPreset();
+
+  // ── DOOR METADATA PARSING ───────────────────────────────────────────────────
   rooms.forEach(room => {
-    if (room.doorDesc) {
+    if (room.doorDesc && !room.noWall) {
       let dx, dy, startA, endA, leafA;
       const off = room.doorOff || 0.5;
-      if (room.doorDesc === 'right') {
-        dx = room.x + room.w; dy = room.y + room.h * off;
-        startA = Math.PI / 2; endA = Math.PI; leafA = Math.PI;
-      } else if (room.doorDesc === 'left') {
-        dx = room.x; dy = room.y + room.h * off;
-        startA = -Math.PI / 2; endA = 0; leafA = 0;
-      } else if (room.doorDesc === 'top') {
-        dx = room.x + room.w * off; dy = room.y;
-        startA = 0; endA = Math.PI / 2; leafA = Math.PI / 2;
-      } else if (room.doorDesc === 'bottom') {
-        dx = room.x + room.w * off; dy = room.y + room.h;
-        startA = Math.PI; endA = 3 * Math.PI / 2; leafA = -Math.PI / 2;
-      }
+      if (room.doorDesc === 'right') { dx = room.x + room.w; dy = room.y + room.h * off; startA = Math.PI / 2; endA = Math.PI; leafA = Math.PI; }
+      else if (room.doorDesc === 'left') { dx = room.x; dy = room.y + room.h * off; startA = -Math.PI / 2; endA = 0; leafA = 0; }
+      else if (room.doorDesc === 'top') { dx = room.x + room.w * off; dy = room.y; startA = 0; endA = Math.PI / 2; leafA = Math.PI / 2; }
+      else if (room.doorDesc === 'bottom') { dx = room.x + room.w * off; dy = room.y + room.h; startA = Math.PI; endA = 3 * Math.PI / 2; leafA = -Math.PI / 2; }
       room.door = { x: dx, y: dy, wall: room.doorDesc, startA, endA, leafA };
+    }
+    
+    if (room.bath && room.bath.door) {
+      const b = room.bath;
+      let bx, by, bStartA, bEndA, bLeafA;
+      if (b.door.wall === 'right') { bx = b.x + b.w; by = b.y + b.h * b.door.pos; bStartA = Math.PI / 2; bEndA = Math.PI; bLeafA = Math.PI; }
+      else if (b.door.wall === 'left') { bx = b.x; by = b.y + b.h * b.door.pos; bStartA = -Math.PI / 2; bEndA = 0; bLeafA = 0; }
+      else if (b.door.wall === 'top') { bx = b.x + b.w * b.door.pos; by = b.y; bStartA = 0; bEndA = Math.PI / 2; bLeafA = Math.PI / 2; }
+      else if (b.door.wall === 'bottom') { bx = b.x + b.w * b.door.pos; by = b.y + b.h; bStartA = Math.PI; bEndA = 3 * Math.PI / 2; bLeafA = -Math.PI / 2; }
+      b.doorMeta = { x: bx, y: by, wall: b.door.wall, startA: bStartA, endA: bEndA, leafA: bLeafA };
     }
   });
 
-  // ── Outdoor Features ──────────────────────────────────────────────────────
-  if (hasGarage) {
-    const g = dir === 'East' ? { x: L + 1, y: 0, w: L * 0.25, h: B * 0.28 }
-      : dir === 'West' ? { x: -L * 0.25 - 1, y: 0, w: L * 0.25, h: B * 0.28 }
-        : dir === 'North' ? { x: 0, y: -B * 0.28 - 1, w: L * 0.28, h: B * 0.25 }
-          : { x: 0, y: B + 1, w: L * 0.28, h: B * 0.25 };
-    rooms.push({ id: id(), label: 'Garage', type: 'garage', ...g, outdoor: true });
-  }
-  if (hasGarden) {
-    const g = dir === 'East' ? { x: L + 1, y: B * 0.35, w: L * 0.3, h: B * 0.35 }
-      : dir === 'West' ? { x: -L * 0.3 - 1, y: B * 0.35, w: L * 0.3, h: B * 0.35 }
-        : dir === 'North' ? { x: L * 0.35, y: -B * 0.35 - 1, w: L * 0.35, h: B * 0.3 }
-          : { x: L * 0.35, y: B + 1, w: L * 0.35, h: B * 0.3 };
-    rooms.push({ id: id(), label: 'Garden', type: 'garden', ...g, outdoor: true });
-  }
-  if (hasPool) {
-    const g = dir === 'East' ? { x: L + 1, y: B * 0.75, w: L * 0.22, h: B * 0.22 }
-      : dir === 'West' ? { x: -L * 0.22 - 1, y: B * 0.75, w: L * 0.22, h: B * 0.22 }
-        : dir === 'North' ? { x: L * 0.75, y: -B * 0.22 - 1, w: L * 0.22, h: B * 0.22 }
-          : { x: L * 0.75, y: B + 1, w: L * 0.22, h: B * 0.22 };
-    rooms.push({ id: id(), label: 'Pool', type: 'pool', ...g, outdoor: true });
-  }
-  if (hasBalcony) {
-    const g = dir === 'East' ? { x: -L * 0.08 - 1, y: B * 0.3, w: L * 0.08, h: B * 0.4 }
-      : dir === 'West' ? { x: L + 1, y: B * 0.3, w: L * 0.08, h: B * 0.4 }
-        : dir === 'North' ? { x: L * 0.3, y: B + 1, w: L * 0.4, h: B * 0.08 }
-          : { x: L * 0.3, y: -B * 0.08 - 1, w: L * 0.4, h: B * 0.08 };
-    rooms.push({ id: id(), label: 'Balcony', type: 'balcony', ...g, outdoor: true });
-  }
+  // ── OUTDOOR ZONES ───────────────────────────────────────────────────────────
+  if (hasGarage) rooms.push({ id: id(), label: 'Garage', type: 'garage', x: -L * 0.25 - 1, y: B * 0.1, w: L * 0.25, h: B * 0.4, outdoor: true });
+  if (hasGarden) rooms.push({ id: id(), label: 'Garden', type: 'garden', x: L + 1, y: B * 0.1, w: L * 0.3, h: B * 0.8, outdoor: true });
+  if (hasPool) rooms.push({ id: id(), label: 'Pool', type: 'pool', x: leftW, y: B + 1, w: centerW, h: B * 0.25, outdoor: true });
+  if (hasBalcony) rooms.push({ id: id(), label: 'Balcony', type: 'balcony', x: leftW, y: -B * 0.15 - 1, w: centerW, h: B * 0.15, outdoor: true });
 
+  const dir = (entryDirection || 'East').trim();
   const entryDoors = {
-    East: { wall: 'right', pos: B * 0.55 }, West: { wall: 'left', pos: B * 0.55 },
-    North: { wall: 'top', pos: L * 0.65 }, South: { wall: 'bottom', pos: L * 0.65 }
+    East: { wall: 'right', pos: B * 0.5 }, West: { wall: 'left', pos: B * 0.5 },
+    North: { wall: 'top', pos: L * 0.5 }, South: { wall: 'bottom', pos: L * 0.5 }
   };
   return { rooms, entry: entryDoors[dir] || entryDoors.East, totalW: L, totalH: B };
 }

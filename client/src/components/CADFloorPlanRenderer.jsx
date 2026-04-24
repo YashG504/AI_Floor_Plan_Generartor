@@ -2,19 +2,21 @@ import { useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 
 // ─── Drawing constants ────────────────────────────────────────────────────────
-const BlueprintNavy = '#16365b';
-const WALL_EXT_COLOR = BlueprintNavy;
-const WALL_INT_COLOR = BlueprintNavy;
-const FURN_COLOR = BlueprintNavy;
-const LABEL_COLOR = BlueprintNavy;
+const INK_COLOR = '#172554'; // Deep navy blueprint ink
+const WALL_EXT_COLOR = INK_COLOR;
+const WALL_INT_COLOR = INK_COLOR;
+const FURN_COLOR = INK_COLOR;
+const LABEL_COLOR = INK_COLOR;
 const LABEL_ROOM_COLOR = 'transparent';
-const OUTDOOR_COLOR = BlueprintNavy;
-const BG_COLOR = '#f9f9f9'; // Off-white clean background
+const OUTDOOR_COLOR = INK_COLOR;
+const BG_COLOR = '#faf9f6'; // Clean warm off-white paper
+const GRID_COLOR = 'transparent'; // No grid
 const OUTDOOR_BG = 'transparent';
 const BATH_BG = 'transparent';
+const FURN_FILL = BG_COLOR; // Solid fill for furniture to hide lines underneath
 
-const WALL_EXT_LW = 7.0;
-const WALL_INT_LW = 6.0;
+const WALL_EXT_LW = 5.0; // Thicker outer wall
+const WALL_INT_LW = 2.0; // Thinner internal wall
 const DOOR_RADIUS = 3.0; // feet (width of gap segment)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,16 +51,18 @@ function drawLabel(ctx, px, py, text, x, y, size = 9, color = LABEL_COLOR, bold 
 
 function doorArc(ctx, px, py, sc, cx, cy, r, startAngle, endAngle, leafAngle) {
   ctx.save();
-  // arc (thin solid line)
-  ctx.strokeStyle = FURN_COLOR;
+  // arc (dashed thin line)
+  ctx.strokeStyle = INK_COLOR;
   ctx.lineWidth = 1.0;
+  ctx.setLineDash([sc(0.2), sc(0.2)]);
   ctx.beginPath();
   ctx.arc(px(cx), py(cy), sc(r), startAngle, endAngle);
   ctx.stroke();
+  ctx.setLineDash([]);
 
-  // door leaf (solid thin line)
-  ctx.strokeStyle = FURN_COLOR;
-  ctx.lineWidth = 1.5;
+  // door leaf (solid thick line)
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(px(cx), py(cy));
   ctx.lineTo(
@@ -71,7 +75,7 @@ function doorArc(ctx, px, py, sc, cx, cy, r, startAngle, endAngle, leafAngle) {
 
 // ─── Furniture drawers ────────────────────────────────────────────────────────
 function drawBed(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   // pillows
   drawRect(ctx, px, py, sc, x + 0.2, y + 0.2, w * 0.4 - 0.2, h * 0.3, null, FURN_COLOR, 1.0);
   drawRect(ctx, px, py, sc, x + w * 0.6, y + 0.2, w * 0.4 - 0.2, h * 0.3, null, FURN_COLOR, 1.0);
@@ -80,13 +84,13 @@ function drawBed(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawWardrobe(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   drawLine(ctx, px, py, sc, x + w / 2, y, x + w / 2, y + h, FURN_COLOR, 1.0);
 }
 
 function drawToilet(ctx, px, py, sc, x, y, w, h) {
   // tank
-  drawRect(ctx, px, py, sc, x, y, w, h * 0.3, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h * 0.3, FURN_FILL, FURN_COLOR, 1.2);
   // bowl
   ctx.save();
   ctx.beginPath();
@@ -96,7 +100,7 @@ function drawToilet(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawSink(ctx, px, py, sc, x, y, s) {
-  drawRect(ctx, px, py, sc, x, y, s, s, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, s, s, FURN_FILL, FURN_COLOR, 1.2);
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(px(x + s / 2), py(y + s / 2), sc(s * 0.35), sc(s * 0.4), 0, 0, Math.PI * 2);
@@ -105,7 +109,7 @@ function drawSink(ctx, px, py, sc, x, y, s) {
 }
 
 function drawBathtub(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.5);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.5);
   ctx.save();
   ctx.beginPath();
   ctx.roundRect(px(x + 0.2), py(y + 0.2), sc(w - 0.4), sc(h - 0.4), 4);
@@ -114,7 +118,7 @@ function drawBathtub(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawSofa(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   // backrest
   drawRect(ctx, px, py, sc, x + 0.1, y + 0.1, w - 0.2, h * 0.30, null, FURN_COLOR, 1.0);
   // armrests
@@ -129,15 +133,15 @@ function drawSofa(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawTVUnit(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
 }
 
 function drawCoffeeTable(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
 }
 
 function drawKitchenCounter(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   // sink
   ctx.save();
   ctx.beginPath();
@@ -157,20 +161,25 @@ function drawKitchenCounter(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawDiningTable(ctx, px, py, sc, x, y, w, h, chairs = 6) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   const cw = 0.6, ch = 0.5;
   // top & bottom chairs
   const hChairs = Math.min(Math.floor(w / 0.85), 4);
   const hGap = w / hChairs;
   for (let i = 0; i < hChairs; i++) {
     const cx = x + hGap * i + (hGap - cw) / 2;
-    drawRect(ctx, px, py, sc, cx, y - ch - 0.1, cw, ch, null, FURN_COLOR, 1.0);
-    drawRect(ctx, px, py, sc, cx, y + h + 0.1, cw, ch, null, FURN_COLOR, 1.0);
+    ctx.beginPath(); ctx.roundRect(px(cx), py(y - ch - 0.1), sc(cw), sc(ch), 4);
+    ctx.fillStyle = FURN_FILL; ctx.fill();
+    ctx.strokeStyle = FURN_COLOR; ctx.lineWidth = 1.0; ctx.stroke();
+    
+    ctx.beginPath(); ctx.roundRect(px(cx), py(y + h + 0.1), sc(cw), sc(ch), 4);
+    ctx.fillStyle = FURN_FILL; ctx.fill();
+    ctx.strokeStyle = FURN_COLOR; ctx.lineWidth = 1.0; ctx.stroke();
   }
 }
 
 function drawDesk(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x, y, w, h, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x, y, w, h, FURN_FILL, FURN_COLOR, 1.2);
   // chair (in front)
   ctx.save();
   ctx.beginPath();
@@ -180,7 +189,7 @@ function drawDesk(ctx, px, py, sc, x, y, w, h) {
 }
 
 function drawGarageCar(ctx, px, py, sc, x, y, w, h) {
-  drawRect(ctx, px, py, sc, x + 1.0, y + 1.0, w - 2.0, h - 2.0, null, FURN_COLOR, 1.2);
+  drawRect(ctx, px, py, sc, x + 1.0, y + 1.0, w - 2.0, h - 2.0, FURN_FILL, FURN_COLOR, 1.2);
 }
 
 // ─── Dimension ruler ──────────────────────────────────────────────────────────
@@ -220,26 +229,20 @@ function drawEntryArrow(ctx, px, py, sc, L, B, dir) {
   };
   const { x, y, dx, dy } = map[dir] || map.East;
   ctx.save();
-  ctx.strokeStyle = '#2563eb'; ctx.fillStyle = '#2563eb';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([sc(0.18), sc(0.1)]);
+  ctx.strokeStyle = INK_COLOR; ctx.fillStyle = INK_COLOR;
+  ctx.lineWidth = 2.0;
   ctx.beginPath();
   ctx.moveTo(px(x), py(y));
   ctx.lineTo(px(x + dx * 2.2), py(y + dy * 2.2));
   ctx.stroke();
-  ctx.setLineDash([]);
   // arrowhead
   const ax = px(x + dx * 2.2), ay = py(y + dy * 2.2);
   const angle = Math.atan2(dy, dx);
   ctx.beginPath();
   ctx.moveTo(ax, ay);
-  ctx.lineTo(ax - sc(0.5) * Math.cos(angle - 0.4), ay - sc(0.5) * Math.sin(angle - 0.4));
-  ctx.lineTo(ax - sc(0.5) * Math.cos(angle + 0.4), ay - sc(0.5) * Math.sin(angle + 0.4));
+  ctx.lineTo(ax - sc(0.6) * Math.cos(angle - 0.5), ay - sc(0.6) * Math.sin(angle - 0.5));
+  ctx.lineTo(ax - sc(0.6) * Math.cos(angle + 0.5), ay - sc(0.6) * Math.sin(angle + 0.5));
   ctx.closePath(); ctx.fill();
-  // label
-  ctx.font = 'bold 9px "Segoe UI", Arial, sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(`${dir} Entry`, px(x + dx * 3.6), py(y + dy * 3.6));
   ctx.restore();
 }
 
@@ -351,7 +354,18 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       const cxOffset = x + (w - cw2) / 2;
       drawKitchenCounter(ctx, px, py, sc, cxOffset, y + 0.8, cw2, 2.2);
       const islandW = cw2 * 0.6;
-      drawRect(ctx, px, py, sc, cxOffset + (cw2 - islandW) / 2, y + 4.5, islandW, 2.0, null, FURN_COLOR, 1.8);
+      const islandX = cxOffset + (cw2 - islandW) / 2;
+      const islandY = y + 4.5;
+      drawRect(ctx, px, py, sc, islandX, islandY, islandW, 2.0, FURN_FILL, FURN_COLOR, 1.8);
+      // Bar stools
+      const stools = 3;
+      const stoolGap = islandW / stools;
+      for (let i = 0; i < stools; i++) {
+        ctx.beginPath();
+        ctx.arc(px(islandX + stoolGap * i + stoolGap / 2), py(islandY + 2.6), sc(0.35), 0, Math.PI * 2);
+        ctx.fillStyle = FURN_FILL; ctx.fill();
+        ctx.strokeStyle = FURN_COLOR; ctx.lineWidth = 1.0; ctx.stroke();
+      }
     }
     if (type === 'dining') {
       const tw = Math.min(w * 0.7, 6.5);
@@ -373,6 +387,8 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
   });
 
   // ── Phase 2: Interior Walls ─────────────────────────────────────────────────
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   ctx.strokeStyle = WALL_INT_COLOR;
   ctx.lineWidth = WALL_INT_LW;
   rooms.forEach(room => {
@@ -431,27 +447,21 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       const { x, y, startA, endA, leafA } = room.door;
       doorArc(ctx, px, py, sc, x, y, DOOR_RADIUS * 0.9, startA, endA, leafA);
     }
-    if (!room.outdoor && room.bath) {
+    if (!room.outdoor && room.bath && room.bath.doorMeta) {
+      const { x: bx, y: by, wall, startA, endA, leafA } = room.bath.doorMeta;
+      doorArc(ctx, px, py, sc, bx, by, DOOR_RADIUS * 0.9, startA, endA, leafA);
+    } else if (!room.outdoor && room.bath) {
       const { x: bx, y: by, w: bw, h: bh } = room.bath;
       doorArc(ctx, px, py, sc, bx, by + bh, DOOR_RADIUS * 0.9, -Math.PI / 2, 0, 0);
     }
   });
 
+  // ── Phase 5.5: Main Entry Arrow ─────────────────────────────────────────────
+  drawEntryArrow(ctx, px, py, sc, L, B, entryDirection);
+
   // ── Phase 6: Room Labels ────────────────────────────────────────────────────
-  rooms.forEach(room => {
-    if (room.label) {
-      const centerX = room.x + room.w / 2;
-      const centerY = room.y + room.h / 2;
-      const fontSize = 10;
-      const isBold = room.type === 'living' || room.outdoor;
-      drawLabel(ctx, px, py, room.label, centerX, centerY, fontSize, LABEL_COLOR, isBold);
-    }
-    if (room.bath && room.bath.label) {
-      drawLabel(ctx, px, py, room.bath.label,
-        room.bath.x + room.bath.w / 2, room.bath.y + room.bath.h / 2,
-        8, LABEL_COLOR, false);
-    }
-  });
+  // Labels are removed by default to maintain the pristine architectural sketch aesthetic.
+  // rooms.forEach(room => { ... });
 
   // ── Phase 7: Outdoor zone outlines ─────────────────────────────────
   rooms.forEach(room => {
@@ -491,45 +501,20 @@ const CADFloorPlanRenderer = ({ cadLayout, length, breadth, entryDirection, rend
 
   return (
     <div className="flex flex-col items-center w-full gap-4">
-      {/* Title badge */}
-      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-        <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
-        2D CAD Floor Plan — {length} ft × {breadth} ft = {length * breadth} sq ft
-      </div>
-
       {/* Canvas */}
-      <div className="w-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm bg-[#f8f7f2]">
+      <div className="w-full overflow-hidden shadow-sm relative" style={{ backgroundColor: BG_COLOR }}>
         <canvas
           ref={canvasRef}
           width={CANVAS_W}
           height={CANVAS_H}
-          style={{ display: 'block', width: '100%', height: 'auto', background: '#f8f7f2' }}
+          style={{ display: 'block', width: '100%', height: 'auto', background: BG_COLOR }}
         />
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-[10px] text-slate-500 dark:text-slate-400 justify-center">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-5 h-0.5 bg-[#1a2744]" style={{ borderWidth: 2 }}></span> Exterior wall
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-5 h-0.5 bg-[#1a2744]" style={{ borderWidth: 1 }}></span> Interior wall
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-5 h-0.5 bg-[#3a5a3a]" style={{ borderStyle: 'dashed', borderWidth: 1 }}></span> Outdoor zone
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-5 h-0.5 bg-blue-500"></span> Entry
-        </span>
-      </div>
-
-      {/* Download */}
-      <div className="w-full flex justify-end">
+        {/* Download */}
         <button
           onClick={handleDownload}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm transition-colors text-slate-800 dark:text-slate-200"
+          className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur shadow hover:bg-slate-50 border border-slate-200 rounded text-xs transition-colors text-slate-700"
         >
-          <Download size={15} /> Download {renderStyle} PNG
+          <Download size={14} /> Download {renderStyle}
         </button>
       </div>
     </div>
