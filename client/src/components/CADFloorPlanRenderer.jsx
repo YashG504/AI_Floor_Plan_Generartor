@@ -254,22 +254,30 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
 
   // padding around house (in feet)
   const PAD_FT = 8;
+  const isRotated = entryDirection === 'East' || entryDirection === 'West';
+  const visualW = isRotated ? B : L;
+  const visualH = isRotated ? L : B;
+
   const scale = Math.min(
-    (canvas.width - 2) / (L + PAD_FT * 2),
-    (canvas.height - 2) / (B + PAD_FT * 2)
+    (canvas.width - 2) / (visualW + PAD_FT * 2),
+    (canvas.height - 2) / (visualH + PAD_FT * 2)
   );
 
-  const ox = (canvas.width - L * scale) / 2;
-  const oy = (canvas.height - B * scale) / 2;
-
-  const px = x => ox + x * scale;
-  const py = y => oy + y * scale;
+  const px = x => (x - L / 2) * scale;
+  const py = y => (y - B / 2) * scale;
   const sc = v => v * scale;
 
   // ── Phase 0: Clear & Background ───────────────────────────────────────────
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+
+  if (entryDirection === 'East') ctx.rotate(-Math.PI / 2);
+  else if (entryDirection === 'West') ctx.rotate(Math.PI / 2);
+  else if (entryDirection === 'North') ctx.rotate(Math.PI);
 
   const { rooms } = cadLayout;
 
@@ -343,10 +351,8 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       const ctH = Math.min(h * 0.12, 3.5);
       const ctX = sofaX + (sofaW - ctW) / 2;
       drawCoffeeTable(ctx, px, py, sc, ctX, sofaY + sofaH + 2.0, ctW, ctH);
-
-      const tvW = Math.min(sofaW * 0.7, 10.0);
-      const tvX = sofaX + (sofaW - tvW) / 2;
-      drawTVUnit(ctx, px, py, sc, tvX, y + h - 2.2, tvW, 1.6);
+      
+      // Removed TV unit to leave the bottom entry wall completely clear for the main gate
     }
     if (type === 'kitchen') {
       const cw2 = Math.min(w * 0.85, 16.0);
@@ -437,9 +443,24 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       ctx.fillRect(gpX - t, gpY - 2, 2 * t, Math.abs(gpH) + 4);
     }
   });
+
+  // Carve main entry gate gap at South (bottom) wall
+  const e_cx = L / 2;
+  const e_cy = B;
+  const e_r = DOOR_RADIUS * 1.2;
+  const e_xMin = e_cx - e_r;
+  const e_xMax = e_cx;
+  const egpX = px(e_xMin), egpY = py(e_cy);
+  const egpW = sc(e_xMax - e_xMin);
+  const et = WALL_EXT_LW + 2;
+  ctx.fillRect(egpX - 2, egpY - et, Math.abs(egpW) + 4, 2 * et);
+
   ctx.globalCompositeOperation = 'source-over';
 
   // ── Phase 5: Door Graphics ──────────────────────────────────────────────────
+  // Main Entry Gate Arc (swinging left-up/inwards)
+  doorArc(ctx, px, py, sc, L / 2, B, DOOR_RADIUS * 1.2, Math.PI, 3 * Math.PI / 2, -Math.PI / 2);
+
   rooms.forEach(room => {
     if (!room.outdoor && room.door) {
       const { x, y, startA, endA, leafA } = room.door;
@@ -454,27 +475,7 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
     }
   });
 
-  // ── Phase 5.5: Main Entry Arrow (subtle, matching reference) ────────────────
-  // Draw a simple thick entry line instead of full arrow for cleaner look
-  const entryMap = {
-    East:  { x1: L + 0.5, y1: B / 2 - 1.5, x2: L + 0.5, y2: B / 2 + 1.5, ax: L + 1.2, ay: B / 2, adx: -1, ady: 0 },
-    West:  { x1: -0.5, y1: B / 2 - 1.5, x2: -0.5, y2: B / 2 + 1.5, ax: -1.2, ay: B / 2, adx: 1, ady: 0 },
-    North: { x1: L / 2 - 1.5, y1: -0.5, x2: L / 2 + 1.5, y2: -0.5, ax: L / 2, ay: -1.2, adx: 0, ady: 1 },
-    South: { x1: L / 2 - 1.5, y1: B + 0.5, x2: L / 2 + 1.5, y2: B + 0.5, ax: L / 2, ay: B + 1.2, adx: 0, ady: -1 }
-  };
-  const em = entryMap[entryDirection] || entryMap.East;
-  ctx.save();
-  ctx.strokeStyle = INK_COLOR; ctx.fillStyle = INK_COLOR;
-  ctx.lineWidth = 3.0;
-  ctx.beginPath(); ctx.moveTo(px(em.ax), py(em.ay));
-  ctx.lineTo(px(em.ax + em.adx * 2.5), py(em.ay + em.ady * 2.5)); ctx.stroke();
-  const eax = px(em.ax + em.adx * 2.5), eay = py(em.ay + em.ady * 2.5);
-  const eangle = Math.atan2(em.ady, em.adx);
-  ctx.beginPath(); ctx.moveTo(eax, eay);
-  ctx.lineTo(eax - sc(0.7) * Math.cos(eangle - 0.5), eay - sc(0.7) * Math.sin(eangle - 0.5));
-  ctx.lineTo(eax - sc(0.7) * Math.cos(eangle + 0.5), eay - sc(0.7) * Math.sin(eangle + 0.5));
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
+
 
   // ── Phase 6: Room Labels ────────────────────────────────────────────────────
   // Labels are removed by default to maintain the pristine architectural sketch aesthetic.
@@ -490,6 +491,64 @@ function drawCADFloorPlan(canvas, cadLayout, entryDirection, length, breadth) {
       ctx.setLineDash([]);
     }
   });
+
+  ctx.restore(); // Restore global canvas translation and rotation
+
+  // ── Phase 8: Main Entry Marker (Upright Text & Arrow) ─────────────────────
+  // Drawn after ctx.restore() so text is always upright on screen
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const hw = (visualW / 2) * scale;
+  const hh = (visualH / 2) * scale;
+  
+  let ex, ey, adx, ady, textAlign, textBaseline, textX, textY, arrowAngle;
+  
+  if (entryDirection === 'East') {
+    ex = cx + hw; ey = cy; adx = -1; ady = 0;
+    textAlign = 'left'; textBaseline = 'middle';
+    textX = ex + sc(4.5); textY = ey;
+    arrowAngle = Math.PI; // pointing left
+  } else if (entryDirection === 'West') {
+    ex = cx - hw; ey = cy; adx = 1; ady = 0;
+    textAlign = 'right'; textBaseline = 'middle';
+    textX = ex - sc(4.5); textY = ey;
+    arrowAngle = 0; // pointing right
+  } else if (entryDirection === 'North') {
+    ex = cx; ey = cy - hh; adx = 0; ady = 1;
+    textAlign = 'center'; textBaseline = 'bottom';
+    textX = ex; textY = ey - sc(4.5);
+    arrowAngle = Math.PI / 2; // pointing down
+  } else { // South
+    ex = cx; ey = cy + hh; adx = 0; ady = -1;
+    textAlign = 'center'; textBaseline = 'top';
+    textX = ex; textY = ey + sc(4.5);
+    arrowAngle = -Math.PI / 2; // pointing up
+  }
+
+  ctx.strokeStyle = INK_COLOR;
+  ctx.fillStyle = INK_COLOR;
+  ctx.lineWidth = 3.0;
+  ctx.lineCap = 'round';
+
+  // Draw arrow stem (starting outside, ending at boundary)
+  ctx.beginPath();
+  ctx.moveTo(ex - adx * sc(3.5), ey - ady * sc(3.5)); // Tail
+  ctx.lineTo(ex, ey); // Head
+  ctx.stroke();
+
+  // Draw arrow head at boundary (ex, ey)
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - sc(1.0) * Math.cos(arrowAngle - 0.5), ey - sc(1.0) * Math.sin(arrowAngle - 0.5));
+  ctx.lineTo(ex - sc(1.0) * Math.cos(arrowAngle + 0.5), ey - sc(1.0) * Math.sin(arrowAngle + 0.5));
+  ctx.closePath();
+  ctx.fill();
+
+  // Draw text
+  ctx.font = `600 ${Math.max(14, Math.floor(sc(2.5)))}px "Inter", sans-serif`;
+  ctx.textAlign = textAlign;
+  ctx.textBaseline = textBaseline;
+  ctx.fillText('Gate Entry', textX, textY);
 }
 
 // ─── React component ──────────────────────────────────────────────────────────
