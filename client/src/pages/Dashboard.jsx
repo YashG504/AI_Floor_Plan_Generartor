@@ -36,6 +36,7 @@ const Dashboard = () => {
   const [generatedLayout, setGeneratedLayout] = useState(null);
   const [cadLayout, setCadLayout] = useState(null);       // ← CAD mode data
   const [renderMode, setRenderMode] = useState(null);     // 'cad' | '3d'
+  const [roomDirections, setRoomDirections] = useState({});
   const [errorMessage, setErrorMessage] = useState(null);
 
   const [features, setFeatures] = useState({
@@ -96,7 +97,7 @@ const Dashboard = () => {
     try {
       const response = await api.post('/generate-floorplan', {
         model: selectedModel,
-        details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection, vastuCompliant }
+        details: { bedrooms, bathrooms, sqFeet, length, breadth, layoutType, archStyle, renderStyle, features: selectedFeatures, entryDirection, vastuCompliant, roomDirections }
       });
       if (response.data.renderMode === 'cad') {
         // Add a short delay for sketch output so the generation feels substantial
@@ -272,10 +273,43 @@ const Dashboard = () => {
               <div className="mb-4">
                 <select value={renderStyle} onChange={(e) => setRenderStyle(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition">
                   <option>Photorealistic 3D</option>
+                  <option>Blueprint</option>
                   <option>Sketch</option>
                 </select>
               </div>
+            </div>
 
+            {/* Room Directions */}
+            <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <h4 className="text-sm text-slate-500 dark:text-slate-400 mb-3">Room Face Directions</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {[
+                  'Living Room', 'Kitchen',
+                  ...Array.from({ length: bedrooms }, (_, i) => `Bedroom ${i + 1}`),
+                  ...Array.from({ length: bathrooms }, (_, i) => `Bathroom ${i + 1}`),
+                  ...(features.diningRoom ? ['Dining Room'] : []),
+                  ...(features.office ? ['Office'] : [])
+                ].map(room => (
+                  <div key={room}>
+                    <label className="text-xs text-slate-600 dark:text-slate-300 block mb-1">{room}</label>
+                    <select
+                      value={roomDirections[room] || 'Auto'}
+                      onChange={(e) => setRoomDirections({ ...roomDirections, [room]: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-1 text-xs focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 transition"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="North">North</option>
+                      <option value="South">South</option>
+                      <option value="East">East</option>
+                      <option value="West">West</option>
+                      <option value="North-East">North-East</option>
+                      <option value="North-West">North-West</option>
+                      <option value="South-East">South-East</option>
+                      <option value="South-West">South-West</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Rooms & Features */}
